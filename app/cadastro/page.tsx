@@ -1,39 +1,194 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import Image from "next/image";
-import { SplashScreen } from '../components/SplashScreen'; // Caminho corrigido
+import { useState } from "react";
+import { Usuario } from "@/types/Usuario";
 
-export default function Page() {
-  const [isLoading, setIsLoading] = useState(true);
+export default function CadastroPage() {
+  const [form, setForm] = useState<Usuario>({
+    nome_completo: "",
+    cpf: "",
+    data_nascimento: "",
+    email: "",
+    telefone: "",
+    cidade: "",
+    estado: "",
+    cep: "",
+    numero: "",
+    complemento: "",
+    senha: ""
+  });
+
+  const [mensagem, setMensagem] = useState("");
+
+  function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
+    setForm({ ...form, [e.target.name]: e.target.value });
+  }
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setMensagem("");
+
+    try {
+      const response = await fetch("http://localhost:3000/cadastro", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify(form)
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        setMensagem(data.error);
+      } else {
+        setMensagem("Usuário criado com sucesso!");
+      }
+    } catch (error) {
+      setMensagem("Erro ao conectar com o servidor.");
+    }
+  }
 
   return (
-    // O GRADIENTE FICA AQUI (NO FUNDO DO SITE)
-    // Ele fica fixo e visível o tempo todo. A Splash Screen apenas o cobre.
-    <main className="flex min-h-screen flex-col items-center justify-center bg-gradient-to-br from-[#9B7C37] via-[#CFAA56] to-[#F2D892]">
+    <div className="min-h-screen bg-gray-100 flex items-center justify-center px-4">
       
-      {/* A Splash Screen (Cobre tudo enquanto isLoading for true) */}
-      {isLoading && (
-        <SplashScreen finishLoading={() => setIsLoading(false)} />
-      )}
+      {/* Card */}
+      <div className="bg-white w-full max-w-md rounded-2xl shadow-lg p-8 space-y-6">
+        
+        <h1 className="text-2xl font-semibold text-center text-gray-800">
+          Criar Conta
+        </h1>
 
-      {/* Conteúdo do Site (Logo, Textos, etc) */}
-      {/* Adicionei uma transição aqui também para o conteúdo surgir suavemente */}
-      <div 
-        className={`transition-all duration-1000 ease-in-out transform ${
-          isLoading ? 'opacity-0 scale-95' : 'opacity-100 scale-100'
-        }`}
-      >
-          <Image 
-              src="/Log.png" 
-              alt="Logo do sistema"
-              width={500}
-              height={300}
-              className="rounded-lg shadow-2xl" // Aumentei a sombra para destaque
-              priority 
+        {/* FORM */}
+        <form onSubmit={handleSubmit} className="space-y-4">
+          
+          {/* Grupo 1 */}
+          <div className="space-y-3">
+            <input
+              name="nome_completo"
+              placeholder="Nome completo"
+              onChange={handleChange}
+              required
+              className="w-full border rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-400"
+            />
+
+            <input
+              name="cpf"
+              placeholder="CPF"
+              onChange={handleChange}
+              required
+              className="w-full border rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-400"
+            />
+
+            <input
+              type="date"
+              name="data_nascimento"
+              onChange={handleChange}
+              required
+              className="w-full border rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-400"
+            />
+          </div>
+
+          {/* Grupo 2 */}
+          <div className="space-y-3">
+            <input
+              name="email"
+              placeholder="Email"
+              onChange={handleChange}
+              required
+              className="w-full border rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-400"
+            />
+
+            <input
+              name="telefone"
+              placeholder="Telefone"
+              onChange={handleChange}
+              required
+              className="w-full border rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-400"
+            />
+          </div>
+
+          {/* Grupo 3 */}
+          <div className="space-y-3">
+            <input
+              name="cidade"
+              placeholder="Cidade"
+              onChange={handleChange}
+              required
+              className="w-full border rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-400"
+            />
+
+            <input
+              name="estado"
+              placeholder="Estado"
+              onChange={handleChange}
+              required
+              className="w-full border rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-400"
+            />
+
+            <input
+              name="cep"
+              placeholder="CEP"
+              onChange={handleChange}
+              required
+              className="w-full border rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-400"
+            />
+
+            <input
+              name="numero"
+              placeholder="Número"
+              onChange={handleChange}
+              required
+              className="w-full border rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-400"
+            />
+
+            <input
+              name="complemento"
+              placeholder="Complemento (opcional)"
+              onChange={handleChange}
+              className="w-full border rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-400"
+            />
+          </div>
+
+          {/* Senha */}
+          <input
+            type="password"
+            name="senha"
+            placeholder="Senha"
+            onChange={handleChange}
+            required
+            className="w-full border rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-400"
           />
-      </div>
 
-    </main>
+          {/* Botão principal */}
+          <button
+            type="submit"
+            className="w-full bg-gradient-to-r from-blue-500 to-blue-600 text-white font-medium py-3 rounded-xl hover:opacity-90 transition"
+          >
+            Cadastrar
+          </button>
+        </form>
+
+        {/* Mensagem */}
+        {mensagem && (
+          <p className="text-center text-sm text-red-500">
+            {mensagem}
+          </p>
+        )}
+
+        {/* Divisor */}
+        <div className="flex items-center gap-2 text-gray-400 text-sm">
+          <div className="flex-1 h-px bg-gray-200" />
+          ou
+          <div className="flex-1 h-px bg-gray-200" />
+        </div>
+
+        {/* Botão secundário */}
+        <button className="w-full border border-blue-500 text-blue-500 py-3 rounded-xl hover:bg-blue-50 transition">
+          Já tenho uma conta
+        </button>
+
+      </div>
+    </div>
   );
 }
