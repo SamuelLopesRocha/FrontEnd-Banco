@@ -2,8 +2,11 @@
 
 import { useState } from "react";
 import { Usuario } from "@/types/Usuario";
+import styles from "./Cadastro.module.css";
 
 export default function CadastroPage() {
+
+  
   const [form, setForm] = useState<Usuario>({
     nome_completo: "",
     cpf: "",
@@ -29,164 +32,52 @@ export default function CadastroPage() {
     setMensagem("");
 
     try {
-      const response = await fetch("http://localhost:3000/cadastro", {
+      const response = await fetch("http://localhost:8000/cadastros", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(form)
       });
 
       const data = await response.json();
-
+      console.log(data);
+      
       if (!response.ok) {
         setMensagem(data.error);
       } else {
         setMensagem("Usuário criado com sucesso!");
       }
-    } catch (error) {
+    } catch {
       setMensagem("Erro ao conectar com o servidor.");
     }
   }
 
   return (
-    <div className="min-h-screen bg-gray-100 flex items-center justify-center px-4">
-      
-      {/* Card */}
-      <div className="bg-white w-full max-w-md rounded-2xl shadow-lg p-8 space-y-6">
-        
-        <h1 className="text-2xl font-semibold text-center text-gray-800">
-          Criar Conta
-        </h1>
+    <div className={styles.container}>
+      <div className={styles.card}>
+        <h1 className={styles.title}>Criar Conta</h1>
 
-        {/* FORM */}
-        <form onSubmit={handleSubmit} className="space-y-4">
-          
-          {/* Grupo 1 */}
-          <div className="space-y-3">
-            <input
-              name="nome_completo"
-              placeholder="Nome completo"
-              onChange={handleChange}
-              required
-              className="w-full border rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-400"
-            />
+        <form onSubmit={handleSubmit} className={styles.form}>
+          <input name="nome_completo" placeholder="Nome completo" onChange={handleChange} required className={styles.input} />
+          <input name="cpf" placeholder="CPF" onChange={handleChange} required className={styles.input} />
+          <input type="date" name="data_nascimento" onChange={handleChange} required className={styles.input} />
+          <input name="email" placeholder="Email" onChange={handleChange} required className={styles.input} />
+          <input name="telefone" placeholder="Telefone" onChange={handleChange} required className={styles.input} />
+          <input name="cidade" placeholder="Cidade" onChange={handleChange} required className={styles.input} />
+          <input name="estado" placeholder="Estado" onChange={handleChange} required className={styles.input} />
+          <input name="cep" placeholder="CEP" onChange={handleChange} required className={styles.input} />
+          <input name="numero" placeholder="Número" onChange={handleChange} required className={styles.input} />
+          <input name="complemento" placeholder="Complemento" onChange={handleChange} className={styles.input} />
+          <input type="password" name="senha" placeholder="Senha" onChange={handleChange} required className={styles.input} />
 
-            <input
-              name="cpf"
-              placeholder="CPF"
-              onChange={handleChange}
-              required
-              className="w-full border rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-400"
-            />
-
-            <input
-              type="date"
-              name="data_nascimento"
-              onChange={handleChange}
-              required
-              className="w-full border rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-400"
-            />
-          </div>
-
-          {/* Grupo 2 */}
-          <div className="space-y-3">
-            <input
-              name="email"
-              placeholder="Email"
-              onChange={handleChange}
-              required
-              className="w-full border rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-400"
-            />
-
-            <input
-              name="telefone"
-              placeholder="Telefone"
-              onChange={handleChange}
-              required
-              className="w-full border rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-400"
-            />
-          </div>
-
-          {/* Grupo 3 */}
-          <div className="space-y-3">
-            <input
-              name="cidade"
-              placeholder="Cidade"
-              onChange={handleChange}
-              required
-              className="w-full border rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-400"
-            />
-
-            <input
-              name="estado"
-              placeholder="Estado"
-              onChange={handleChange}
-              required
-              className="w-full border rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-400"
-            />
-
-            <input
-              name="cep"
-              placeholder="CEP"
-              onChange={handleChange}
-              required
-              className="w-full border rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-400"
-            />
-
-            <input
-              name="numero"
-              placeholder="Número"
-              onChange={handleChange}
-              required
-              className="w-full border rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-400"
-            />
-
-            <input
-              name="complemento"
-              placeholder="Complemento (opcional)"
-              onChange={handleChange}
-              className="w-full border rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-400"
-            />
-          </div>
-
-          {/* Senha */}
-          <input
-            type="password"
-            name="senha"
-            placeholder="Senha"
-            onChange={handleChange}
-            required
-            className="w-full border rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-400"
-          />
-
-          {/* Botão principal */}
-          <button
-            type="submit"
-            className="w-full bg-gradient-to-r from-blue-500 to-blue-600 text-white font-medium py-3 rounded-xl hover:opacity-90 transition"
-          >
+          <button type="submit" className={styles.buttonPrimary}>
             Cadastrar
           </button>
+          {mensagem && <p className={styles.message}>{mensagem}</p>}
+
+          <button className={styles.buttonSecondary}>
+            Já tenho uma conta
+          </button>
         </form>
-
-        {/* Mensagem */}
-        {mensagem && (
-          <p className="text-center text-sm text-red-500">
-            {mensagem}
-          </p>
-        )}
-
-        {/* Divisor */}
-        <div className="flex items-center gap-2 text-gray-400 text-sm">
-          <div className="flex-1 h-px bg-gray-200" />
-          ou
-          <div className="flex-1 h-px bg-gray-200" />
-        </div>
-
-        {/* Botão secundário */}
-        <button className="w-full border border-blue-500 text-blue-500 py-3 rounded-xl hover:bg-blue-50 transition">
-          Já tenho uma conta
-        </button>
 
       </div>
     </div>
