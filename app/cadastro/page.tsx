@@ -5,6 +5,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { Usuario } from "@/types/Usuario";
 import { FiArrowLeft, FiLock, FiMail, FiMapPin, FiUser, FiPhone, FiHash, FiCalendar } from "react-icons/fi";
+import { InputProps } from "@/types/Input";
 
 const TOTAL_STEPS = 3;
 
@@ -176,7 +177,14 @@ export default function CadastroPage() {
   );
 }
 
-function Input({ name, placeholder, type = "text", onChange, required = true, icon }: any) {
+function Input({
+  name,
+  placeholder,
+  type = "text",
+  onChange,
+  required = true,
+  icon,
+}: InputProps) {
   return (
     <div className="relative group w-full">
       {icon && (
@@ -184,6 +192,7 @@ function Input({ name, placeholder, type = "text", onChange, required = true, ic
           {icon}
         </div>
       )}
+
       <input
         type={type}
         name={name}
@@ -192,7 +201,7 @@ function Input({ name, placeholder, type = "text", onChange, required = true, ic
         required={required}
         className={`
           w-full
-          ${icon ? 'pl-14' : 'px-6'} py-4 rounded-xl
+          ${icon ? "pl-14" : "px-6"} py-4 rounded-xl
           bg-white/[0.02] border border-white/[0.06]
           text-white text-sm outline-none
           focus:border-[#CFAA56]/40 focus:bg-white/[0.04]

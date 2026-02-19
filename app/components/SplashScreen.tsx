@@ -35,7 +35,7 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({ finishLoading }) => 
 
       <div className="relative flex flex-col items-center">
         <img
-          src="/Log.png"
+          src="/AtlasLogo.svg"
           alt="Atlas Bank Logo"
           className="w-[260px] mb-8 opacity-0 animate-[fadeIn_1.2s_forwards]"
         />

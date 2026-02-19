@@ -61,6 +61,18 @@ export default function Home() {
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
+  useEffect(() => {
+    if (isMenuOpen) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "auto";
+    }
+
+    return () => {
+      document.body.style.overflow = "auto";
+    };
+  }, [isMenuOpen]);
+
   const navLinks = [
     { name: "Sobre", href: "#Sobre" },
     { name: "Benefícios", href: "#Beneficios" },
@@ -79,15 +91,11 @@ export default function Home() {
           }`}
       >
         <div className="max-w-7xl mx-auto px-6 flex items-center justify-between">
-
-          {/* GROUP: LOGO + NAV LINKS */}
           <div className="flex items-center gap-12">
-            {/* LOGO */}
             <div className="hover:opacity-80 transition-opacity cursor-pointer relative z-50 shrink-0">
-              <Image src="/Log2.png" alt="Logo" width={48} height={48} priority className="w-auto h-10" />
+              <Image src="/AtlasLogo.svg" alt="Logo" width={64} height={64} priority className="w-auto h-10" />
             </div>
 
-            {/* DESKTOP NAV */}
             <div className="hidden md:flex items-center gap-8 text-sm font-medium text-gray-400">
               {navLinks.map((link) => (
                 <button
@@ -105,7 +113,6 @@ export default function Home() {
             </div>
           </div>
 
-          {/* GROUP: ACTIONS (RIGHT SIDE) */}
           <div className="flex items-center gap-4 relative z-50">
             <Link href="/login" className="hidden sm:block px-6 py-2.5 rounded-full font-bold text-sm bg-gradient-to-r from-[#CFAA56] to-[#9B7C37] text-black hover:shadow-[0_0_20px_rgba(207,170,86,0.4)] transition-all active:scale-95">
               Entrar
@@ -120,25 +127,33 @@ export default function Home() {
             </button>
           </div>
         </div>
-
-        {/* MOBILE MENU OVERLAY */}
-        <div className={`fixed inset-0 bg-[#0A0A0A] z-40 flex flex-col items-center justify-center gap-8 transition-all duration-500 md:hidden ${isMenuOpen ? "opacity-100 visible" : "opacity-0 invisible pointer-events-none"
-          }`}>
-          {navLinks.map((link) => (
-            <a
-              key={link.name}
-              href={link.href}
-              onClick={() => setIsMenuOpen(false)}
-              className="text-2xl font-semibold hover:text-[#CFAA56] transition-colors"
-            >
-              {link.name}
-            </a>
-          ))}
-          <button className="mt-4 px-10 py-4 rounded-full font-bold bg-white text-black">
-            Entrar na conta
-          </button>
-        </div>
       </nav>
+
+      {/* MOBILE MENU */}
+      <div
+        className={`fixed inset-0 bg-[#0A0A0A] z-40 flex flex-col items-center justify-center gap-8 transition-all duration-300 md:hidden
+            ${isMenuOpen
+            ? "opacity-100 translate-y-0"
+            : "opacity-0 -translate-y-4 pointer-events-none"}
+           `}
+      >
+        {navLinks.map((link) => (
+          <a
+            key={link.name}
+            href={link.href}
+            onClick={() => setIsMenuOpen(false)}
+            className="text-2xl font-semibold hover:text-[#CFAA56] transition-colors"
+          >
+            {link.name}
+          </a>
+        ))}
+        <Link
+          href="/login"
+          className="mt-4 px-10 py-4 rounded-full font-bold bg-white text-black"
+        >
+          Entrar na conta
+        </Link>
+      </div>
 
       {/* Sobre */}
       <section id="Sobre" className="relative pt-32 pb-32 px-6 overflow-hidden">
@@ -233,7 +248,7 @@ export default function Home() {
           <div className="h-px w-full bg-gradient-to-r from-transparent via-white/10 to-transparent mb-10" />
 
           {/* FEATURES */}
-          <div className="grid gap-6 sm:grid-cols-2 md:grid-cols-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 md:gap-6">
             <Feature
               icon={<SiPix size={24} />}
               title="Pix Ilimitado"
@@ -297,7 +312,7 @@ export default function Home() {
                 alt="Cartão Atlas"
                 width={520}
                 height={340}
-                className="relative z-10 rotate-[-6deg] hover:rotate-0 hover:scale-105 transition-all duration-500 drop-shadow-[0_40px_80px_rgba(0,0,0,0.9)]"/>
+                className="relative z-10 rotate-[-6deg] hover:rotate-0 hover:scale-105 transition-all duration-500 drop-shadow-[0_40px_80px_rgba(0,0,0,0.9)]" />
             </div>
           </div>
         </div>
@@ -309,16 +324,20 @@ export default function Home() {
 
 function Feature({ icon, title, desc }: FeatureProps & { desc?: string }) {
   return (
-    <div className="group p-10 rounded-[2rem] bg-[#121212] border border-white/[0.03] hover:border-[#CFAA56]/50 hover:bg-[#161616] transition-all duration-500 cursor-default">
-      <div className="flex gap-6 items-center mb-6">
-        <div className="w-16 h-16 shrink-0 rounded-2xl flex items-center justify-center bg-gradient-to-br from-[#CFAA56]/20 to-[#9B7C37]/5 text-[#CFAA56] group-hover:scale-110 group-hover:rotate-3 transition-all duration-500">
+    <div className="group p-5 sm:p-7 md:p-10 rounded-2xl md:rounded-[2rem] bg-[#121212] border border-white/[0.03] hover:border-[#CFAA56]/50 hover:bg-[#161616] transition-all duration-500">
+
+      <div className="flex items-start sm:items-center gap-4 sm:gap-6 mb-4 sm:mb-6">
+
+        <div className="w-12 h-12 sm:w-14 sm:h-14 md:w-16 md:h-16 shrink-0 rounded-xl md:rounded-2xl flex items-center justify-center bg-gradient-to-br from-[#CFAA56]/20 to-[#9B7C37]/5 text-[#CFAA56] group-hover:scale-110 group-hover:rotate-3 transition-all duration-500">
           {icon}
         </div>
-        <h3 className="text-2xl text-[#CFAA56] font-bold tracking-tight">
+
+        <h3 className="text-lg sm:text-xl md:text-2xl text-[#CFAA56] font-bold leading-tight">
           {title}
         </h3>
       </div>
-      <p className="text-gray-500 leading-relaxed text-sm">
+
+      <p className="text-gray-400 text-sm sm:text-base leading-relaxed">
         {desc}
       </p>
     </div>
