@@ -3,15 +3,19 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { FiMail, FiLock } from "react-icons/fi";
 import Input from "../components/Input";
 
 export default function LoginPage() {
+
+  const router = useRouter();
+
   const [form, setForm] = useState({
     email: "",
     senha: "",
   });
-
+  
   const [mensagem, setMensagem] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -25,7 +29,7 @@ export default function LoginPage() {
     setLoading(true);
 
     try {
-      const response = await fetch("http://localhost:8000/login", {
+      const response = await fetch("http://localhost:8000/auth/login", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -38,8 +42,9 @@ export default function LoginPage() {
       if (!response.ok) {
         setMensagem(data.error || "Falha no login");
       } else {
-        localStorage.setItem("token", data.access_token);
+        localStorage.setItem("token", data.token);
         setMensagem("Login realizado com sucesso!");
+        router.push("/painel");
       }
     } catch {
       setMensagem("Erro ao conectar com o servidor.");

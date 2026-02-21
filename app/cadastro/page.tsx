@@ -38,14 +38,14 @@ export default function CadastroPage() {
     e.preventDefault();
     setMensagem("");
     try {
-      const response = await fetch("http://localhost:8000/cadastros", {
+      const response = await fetch("http://localhost:8000/usuarios", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(form),
       });
       const data = await response.json();
       if (!response.ok) setMensagem(data.error);
-      else setMensagem("Usuário criado com sucesso!");
+      else setMensagem(data.message);
     } catch {
       setMensagem("Erro ao conectar com o servidor.");
     }
@@ -103,7 +103,7 @@ export default function CadastroPage() {
                     {step === 3 && "Segurança"}
                   </h2>
                 </div>
-                <span className="text-[#CFAA56] font-mono text-sm font-bold">{Math.round(progress)}%</span>
+               
               </div>
               <div className="w-full h-[2px] bg-white/5 rounded-full overflow-hidden">
                 <div

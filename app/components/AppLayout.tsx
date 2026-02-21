@@ -16,9 +16,10 @@ type Props = {
     children: React.ReactNode;
     title?: string;
     subtitle?: string;
+    user?: any;
 };
 
-export default function AppLayout({ children, title, subtitle }: Props) {
+export default function AppLayout({ children, title, subtitle, user }: Props) {
     const router = useRouter();
     const pathname = usePathname();
     const [menuOpen, setMenuOpen] = useState(false);
@@ -84,11 +85,20 @@ export default function AppLayout({ children, title, subtitle }: Props) {
                     {/* PERFIL */}
                     <div className="flex items-center gap-3 ml-auto">
                         <div className="text-right hidden sm:block">
-                            <p className="text-sm font-bold">Matheus</p>
-                            <p className="text-xs text-gray-500">Conta Corrente</p>
+                            <p className="text-sm font-bold">
+                                {/* 3. Pega o primeiro nome do banco de dados */}
+                                {user?.nome_completo ? user.nome_completo.split(" ")[0] : "Carregando..."}
+                            </p>
+                            <p className="text-xs text-gray-500 capitalize">
+                                {/* 4. Pega o tipo de conta (Corrente/Black/etc) */}
+                                Conta {user?.tipo_conta?.toLowerCase() || "Conta Corrente"}
+                            </p>
                         </div>
 
-                        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#CFAA56] to-[#9B7C37]" />
+                        {/* 5. Avatar com inicial dinâmica */}
+                        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#CFAA56] to-[#9B7C37] flex items-center justify-center text-black font-bold">
+                            {user?.nome_completo ? user.nome_completo[0] : "?"}
+                        </div>
                     </div>
 
                 </header>

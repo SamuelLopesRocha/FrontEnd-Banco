@@ -1,13 +1,69 @@
 "use client";
 
+import { useState, useEffect, ChangeEvent } from "react";
+import { useRouter } from "next/navigation";
 import AppLayout from "../components/AppLayout";
-import { useState, ChangeEvent } from "react";
-import { FiDollarSign, FiTrendingUp, FiClock, FiCheckCircle } from "react-icons/fi";
+import { FiDollarSign, FiTrendingUp, FiClock, FiCheckCircle, FiLogOut } from "react-icons/fi";
 import { EmprestimosInputProps, LoanItemProps, SummaryCardProps } from "@/types/Emprestimos";
 
 export default function EmprestimosPage() {
+    const router = useRouter();
     const [valor, setValor] = useState("");
     const [parcelas, setParcelas] = useState("12");
+    const [isLoading, setIsLoading] = useState(true);
+    const [usuario, setUsuario] = useState<any>(null);
+
+    // ==========================================
+    // 1. VERIFICAÇÃO DE LOGIN E BUSCA DE DADOS
+    // ==========================================
+    useEffect(() => {
+        const token = localStorage.getItem("token");
+
+        if (!token) {
+            router.push("/login");
+            return;
+        }
+
+        async function carregarDados() {
+            try {
+                const response = await fetch("http://localhost:8000/usuarios/meus-dados", {
+                    method: "GET",
+                    headers: {
+                        "Authorization": `Bearer ${token}`,
+                        "Content-Type": "application/json",
+                    },
+                });
+
+                if (!response.ok) {
+                    throw new Error("Sessão inválida ou expirada.");
+                }
+
+                const data = await response.json();
+                setUsuario(data);
+            } catch (error) {
+                console.error("ERRO EM EMPRÉSTIMOS:", error);
+                localStorage.removeItem("token");
+                router.push("/login");
+            } finally {
+                setIsLoading(false);
+            }
+        }
+
+        carregarDados();
+    }, [router]);
+
+    // ==========================================
+    // 2. FUNÇÃO DE LOGOUT
+    // ==========================================
+    function handleLogout() {
+        localStorage.removeItem("token");
+        router.push("/login");
+    }
+
+    // Função auxiliar para formatar moeda
+    const formatarMoeda = (valor: number) => {
+        return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(valor);
+    };
 
     function handleChange(e: ChangeEvent<HTMLInputElement | HTMLSelectElement>) {
         if (e.target.name === "valor") setValor(e.target.value);
@@ -18,18 +74,39 @@ export default function EmprestimosPage() {
         console.log({ valor, parcelas });
     }
 
+    // Tela de loading
+    if (isLoading || !usuario) {
+        return (
+            <div className="min-h-screen bg-[#050505] flex flex-col items-center justify-center text-[#CFAA56]">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#CFAA56] mb-4"></div>
+                <p>Analisando propostas de crédito...</p>
+            </div>
+        );
+    }
+
     return (
         <AppLayout
             title="Empréstimos"
             subtitle="Simule e contrate crédito com facilidade"
+            user={usuario}
         >
-            {/* RESUMO */}
-            <div className="grid md:grid-cols-3 gap-6 mb-8">
+            {/* BOTÃO DE LOGOUT */}
+            <div className="flex justify-end mb-6">
+                <button 
+                    onClick={handleLogout}
+                    className="flex items-center gap-2 px-4 py-2 rounded-xl border border-red-500/20 text-red-400 hover:bg-red-500/10 transition-colors text-sm font-medium"
+                >
+                    <FiLogOut /> Sair da conta
+                </button>
+            </div>
 
+            {/* RESUMO DINÂMICO */}
+            <div className="grid md:grid-cols-3 gap-6 mb-8">
                 <SummaryCard
                     icon={<FiDollarSign />}
                     title="Limite disponível"
-                    value="R$ 12.000,00"
+                    /* Usando o limite de crédito do usuário que vem do banco */
+                    value={formatarMoeda(usuario.limite_credito || 12000)}
                 />
 
                 <SummaryCard
@@ -43,7 +120,6 @@ export default function EmprestimosPage() {
                     title="Prazo máximo"
                     value="48 meses"
                 />
-
             </div>
 
             {/* SIMULADOR + HISTÓRICO */}
@@ -51,13 +127,8 @@ export default function EmprestimosPage() {
 
                 {/* SIMULADOR */}
                 <div className="bg-[#0A0A0A] border border-white/5 rounded-3xl p-6">
-
-                    <h3 className="text-xl font-bold mb-6">
-                        Simular empréstimo
-                    </h3>
-
+                    <h3 className="text-xl font-bold mb-6">Simular empréstimo</h3>
                     <div className="space-y-4">
-
                         <Input
                             name="valor"
                             placeholder="Valor desejado"
@@ -69,7 +140,8 @@ export default function EmprestimosPage() {
                             name="parcelas"
                             value={parcelas}
                             onChange={handleChange}
-                            className="w-full px-5 py-4 rounded-xl bg-white/[0.02] border border-white/[0.06] text-sm text-white outline-none ">
+                            className="w-full px-5 py-4 rounded-xl bg-white/[0.02] border border-white/[0.06] text-sm text-white outline-none focus:border-[#CFAA56]/40 transition"
+                        >
                             <option className="bg-[#0a0a0a]" value="6">6 parcelas</option>
                             <option className="bg-[#0a0a0a]" value="12">12 parcelas</option>
                             <option className="bg-[#0a0a0a]" value="24">24 parcelas</option>
@@ -77,56 +149,45 @@ export default function EmprestimosPage() {
                             <option className="bg-[#0a0a0a]" value="48">48 parcelas</option>
                         </select>
 
-                        {/* RESULTADO MOCK */}
+                        {/* RESULTADO DINÂMICO (Simulação básica) */}
                         <div className="p-4 rounded-xl bg-white/[0.02] border border-white/[0.04]">
-                            <p className="text-sm text-gray-400 mb-1">
-                                Parcela estimada
-                            </p>
-
+                            <p className="text-sm text-gray-400 mb-1">Parcela estimada</p>
                             <p className="text-2xl font-bold text-[#CFAA56]">
-                                R$ 420,00
+                                {valor ? formatarMoeda((Number(valor) * 1.2) / Number(parcelas)) : "R$ 0,00"}
                             </p>
                         </div>
 
                         <button
                             onClick={solicitar}
-                            className="w-full py-3 rounded-xl bg-[#CFAA56] text-black font-bold hover:bg-[#e2bd6b] transition cursor-pointer">
+                            className="w-full py-3 rounded-xl bg-[#CFAA56] text-black font-bold hover:bg-[#e2bd6b] transition cursor-pointer"
+                        >
                             Solicitar empréstimo
                         </button>
-
                     </div>
                 </div>
 
                 {/* HISTÓRICO */}
                 <div className="bg-[#0A0A0A] border border-white/5 rounded-3xl p-6">
-
-                    <h3 className="text-xl font-bold mb-6">
-                        Seus empréstimos
-                    </h3>
-
+                    <h3 className="text-xl font-bold mb-6">Seus empréstimos</h3>
                     <div className="space-y-4">
-
                         <LoanItem
                             title="Crédito pessoal"
                             status="Em andamento"
                             value="R$ 5.000,00"
                         />
-
                         <LoanItem
                             title="Compra emergencial"
                             status="Quitado"
                             value="R$ 1.200,00"
                         />
-
                     </div>
                 </div>
-
             </div>
         </AppLayout>
     );
 }
 
-/* ---------- COMPONENTES ---------- */
+/* ---------- COMPONENTES INTERNOS ---------- */
 
 function Input({ name, placeholder, value, onChange }: EmprestimosInputProps) {
     return (
@@ -135,7 +196,8 @@ function Input({ name, placeholder, value, onChange }: EmprestimosInputProps) {
             value={value}
             onChange={onChange}
             placeholder={placeholder}
-            className="w-full px-5 py-4 rounded-xl bg-white/[0.02]  border border-white/[0.06] text-sm text-white outline-none focus:border-[#CFAA56]/40 focus:bg-white/[0.04] transition" />
+            className="w-full px-5 py-4 rounded-xl bg-white/[0.02] border border-white/[0.06] text-sm text-white outline-none focus:border-[#CFAA56]/40 focus:bg-white/[0.04] transition"
+        />
     );
 }
 
@@ -145,7 +207,6 @@ function SummaryCard({ icon, title, value }: SummaryCardProps) {
             <div className="text-2xl text-[#CFAA56]">
                 {icon}
             </div>
-
             <div>
                 <p className="text-gray-400 text-sm">{title}</p>
                 <p className="font-bold text-lg">{value}</p>
@@ -158,18 +219,15 @@ function LoanItem({ title, status, value }: LoanItemProps) {
     return (
         <div className="flex justify-between items-center p-4 rounded-xl bg-white/[0.02] border border-white/[0.04]">
             <div className="flex items-center gap-3">
-
                 <div className="w-10 h-10 rounded-lg flex items-center justify-center bg-[#CFAA56]/20 text-[#CFAA56]">
                     <FiCheckCircle />
                 </div>
-
                 <div>
                     <p className="font-medium">{title}</p>
                     <p className="text-xs text-gray-500">{status}</p>
                 </div>
-            </div >
-
+            </div>
             <span className="font-bold">{value}</span>
-        </div >
+        </div>
     );
 }
