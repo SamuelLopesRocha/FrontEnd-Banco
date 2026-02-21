@@ -27,7 +27,7 @@ export default function PagamentosPage() {
 
         async function carregarDados() {
             try {
-                const response = await fetch("http://localhost:8000/usuarios/meus-dados", {
+                const response = await fetch("https://api-atlasbank.onrender.com/usuarios/meus-dados", {
                     method: "GET",
                     headers: {
                         "Authorization": `Bearer ${token}`,

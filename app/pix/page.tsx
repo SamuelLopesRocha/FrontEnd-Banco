@@ -47,7 +47,7 @@ export default function PixPage() {
 
         async function carregarDados() {
             try {
-                const resUser = await fetch("http://localhost:8000/usuarios/meus-dados", {
+                const resUser = await fetch("https://api-atlasbank.onrender.com/usuarios/meus-dados", {
                     headers: { "Authorization": `Bearer ${token}` }
                 });
                 if (!resUser.ok) throw new Error("Sessão expirada.");
@@ -55,13 +55,13 @@ export default function PixPage() {
                 setUsuario(dataUser);
 
                 if (dataUser.numero_conta) {
-                    const resTrans = await fetch(`http://localhost:8000/transacoes/${dataUser.numero_conta}`, {
+                    const resTrans = await fetch(`https://api-atlasbank.onrender.com/transacoes/${dataUser.numero_conta}`, {
                         headers: { "Authorization": `Bearer ${token}` }
                     });
                     if (resTrans.ok) setTransacoes(await resTrans.json());
                 }
 
-                const resChaves = await fetch("http://localhost:8000/chaves-pix", {
+                const resChaves = await fetch("https://api-atlasbank.onrender.com/chaves-pix", {
                     headers: { "Authorization": `Bearer ${token}` }
                 });
                 if (resChaves.ok) setMinhasChaves(await resChaves.json());
@@ -93,7 +93,7 @@ export default function PixPage() {
         setLoadingChave(true);
         try {
             const token = localStorage.getItem("token");
-            const response = await fetch("http://localhost:8000/chaves-pix", {
+            const response = await fetch("https://api-atlasbank.onrender.com/chaves-pix", {
                 method: "POST",
                 headers: {
                     "Authorization": `Bearer ${token}`,
@@ -113,7 +113,7 @@ export default function PixPage() {
                 message: `Tudo certo! Sua chave ${tipo} foi vinculada à sua conta e já está pronta para uso.`
             });
 
-            const resChaves = await fetch("http://localhost:8000/chaves-pix", {
+            const resChaves = await fetch("https://api-atlasbank.onrender.com/chaves-pix", {
                 headers: { "Authorization": `Bearer ${token}` }
             });
             if (resChaves.ok) setMinhasChaves(await resChaves.json());
@@ -142,7 +142,7 @@ export default function PixPage() {
         setDialog({ ...dialog, isOpen: false }); // Fecha o modal de confirmação
         try {
             const token = localStorage.getItem("token");
-            const response = await fetch(`http://localhost:8000/chaves-pix/${chave}`, {
+            const response = await fetch(`https://api-atlasbank.onrender.com/chaves-pix/${chave}`, {
                 method: "DELETE",
                 headers: { "Authorization": `Bearer ${token}` }
             });
@@ -174,7 +174,7 @@ export default function PixPage() {
         setLoadingPix(true);
         try {
             const token = localStorage.getItem("token");
-            const resChave = await fetch(`http://localhost:8000/chaves-pix/consultar/${chaveDestino}`, {
+            const resChave = await fetch(`https://api-atlasbank.onrender.com/chaves-pix/consultar/${chaveDestino}`, {
                 headers: { "Authorization": `Bearer ${token}` }
             });
             const dataChave = await resChave.json();
@@ -201,7 +201,7 @@ export default function PixPage() {
         setLoadingPix(true);
         try {
             const token = localStorage.getItem("token");
-            const response = await fetch("http://localhost:8000/transacoes/pix", {
+            const response = await fetch("https://api-atlasbank.onrender.com/transacoes/pix", {
                 method: "POST",
                 headers: {
                     "Authorization": `Bearer ${token}`,
