@@ -2,12 +2,15 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { PixActionProps, PixItemProps } from "@/types/Pix";
+import { Pix, PixActionProps, PixItemProps } from "@/types/Pix";
 import AppLayout from "../components/AppLayout";
-import { FaPix, FaKey, FaTrash } from "react-icons/fa6";
-import { FiArrowUpRight, FiLogOut, FiX, FiPlus, FiCheckCircle, FiAlertTriangle, FiInfo, FiArrowUp, FiArrowDown } from "react-icons/fi";
+import { FaKey, FaTrash } from "react-icons/fa6";
+import { FiArrowUpRight, FiX, FiPlus, FiCheckCircle, FiAlertTriangle, FiInfo, FiArrowUp, FiArrowDown } from "react-icons/fi";
+import { Conta } from "@/types/Conta";
+import { UsuarioAPI } from "@/types/Usuario";
+import { ApiError } from "@/types/Error";
+import { Transacao, TransacaoAPI } from "@/types/Extrato";
 
-// Tipagem para o nosso novo Modal de Diálogo Customizado
 type DialogConfig = {
     isOpen: boolean;
     type: 'success' | 'confirm' | 'error';
@@ -19,46 +22,56 @@ type DialogConfig = {
 export default function PixPage() {
     const router = useRouter();
     const [isLoading, setIsLoading] = useState(true);
-    const [usuario, setUsuario] = useState<any>(null);
-    const [transacoes, setTransacoes] = useState<any[]>([]);
+    const [usuario, setUsuario] = useState<UsuarioAPI | null>(null);
+    const [conta, setConta] = useState<Conta | null>(null);
+    const [transacoes, setTransacoes] = useState<Transacao[]>([]);
 
-    // Estado do Modal Customizado (Alerta/Confirmação)
     const [dialog, setDialog] = useState<DialogConfig>({
         isOpen: false, type: 'success', title: '', message: ''
     });
 
-    // Estados das Chaves Pix
-    const [minhasChaves, setMinhasChaves] = useState<any[]>([]);
+    const [minhasChaves, setMinhasChaves] = useState<Pix[]>([]);
     const [showChavesModal, setShowChavesModal] = useState(false);
     const [loadingChave, setLoadingChave] = useState(false);
 
-    // Estados do Formulário de Envio
+    const [nomesPix, setNomesPix] = useState<Record<string, string>>({});
+
     const [showForm, setShowForm] = useState(false);
     const [chaveDestino, setChaveDestino] = useState("");
     const [valorPix, setValorPix] = useState("");
     const [loadingPix, setLoadingPix] = useState(false);
 
     useEffect(() => {
-        const token = localStorage.getItem("token");
-        if (!token) {
-            router.push("/login");
-            return;
-        }
-
         async function carregarDados() {
+            const data = localStorage.getItem("data");
+
+            if (!data) {
+                router.push("/login");
+                return;
+            }
+
             try {
-                const resUser = await fetch("https://api-atlasbank.onrender.com/usuarios/meus-dados", {
+                const parsedData = JSON.parse(data);
+
+                const token = parsedData.token;
+                const usuario: UsuarioAPI = parsedData.usuario;
+                const conta: Conta = parsedData.conta;
+
+                if (!token || !usuario || !conta) {
+                    localStorage.removeItem("data");
+                    router.push("/login");
+                    return;
+                }
+
+                setUsuario(usuario);
+                setConta(conta);
+
+                const resTrans = await fetch(`https://api-atlasbank.onrender.com/transacoes`, {
                     headers: { "Authorization": `Bearer ${token}` }
                 });
-                if (!resUser.ok) throw new Error("Sessão expirada.");
-                const dataUser = await resUser.json();
-                setUsuario(dataUser);
-
-                if (dataUser.numero_conta) {
-                    const resTrans = await fetch(`https://api-atlasbank.onrender.com/transacoes/${dataUser.numero_conta}`, {
-                        headers: { "Authorization": `Bearer ${token}` }
-                    });
-                    if (resTrans.ok) setTransacoes(await resTrans.json());
+                if (resTrans.ok) {
+                    const result: TransacaoAPI = await resTrans.json();
+                    setTransacoes(result.dados);
                 }
 
                 const resChaves = await fetch("https://api-atlasbank.onrender.com/chaves-pix", {
@@ -77,22 +90,16 @@ export default function PixPage() {
         carregarDados();
     }, [router]);
 
-    function handleLogout() {
-        localStorage.removeItem("token");
-        router.push("/login");
-    }
-
     const formatarMoeda = (valor: number) => {
         return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(valor);
     };
 
-    // ==========================================
-    // CADASTRAR NOVA CHAVE PIX
-    // ==========================================
     async function handleVincularChave(tipo: string, valorChave: string) {
         setLoadingChave(true);
         try {
-            const token = localStorage.getItem("token");
+            const data = localStorage.getItem("data");
+            const parsed = data ? JSON.parse(data) : null;
+            const token = parsed?.token;
             const response = await fetch("https://api-atlasbank.onrender.com/chaves-pix", {
                 method: "POST",
                 headers: {
@@ -105,7 +112,6 @@ export default function PixPage() {
             const result = await response.json();
             if (!response.ok) throw new Error(result.error || "Erro ao cadastrar chave.");
 
-            // TROCAMOS O ALERT PELO NOSSO MODAL
             setDialog({
                 isOpen: true,
                 type: 'success',
@@ -118,30 +124,99 @@ export default function PixPage() {
             });
             if (resChaves.ok) setMinhasChaves(await resChaves.json());
 
-        } catch (error: any) {
-            setDialog({ isOpen: true, type: 'error', title: 'Ops, algo deu errado', message: error.message });
+        } catch (error: unknown) {
+            setDialog({ isOpen: true, type: 'error', title: 'Ops, algo deu errado', message: (error as ApiError)?.message || "Erro desconhecido." });
         } finally {
             setLoadingChave(false);
         }
     }
 
-    // ==========================================
-    // EXCLUIR CHAVE PIX (Dividido em 2 partes)
-    // ==========================================
+    async function verSaldo() {
+        const data = localStorage.getItem("data");
+        if (!data) return;
+
+        const parsed = JSON.parse(data);
+
+        try {
+            const response = await fetch(
+                `https://api-atlasbank.onrender.com/contas/${parsed.usuario.usuario_id}`,
+                {
+                    headers: {
+                        Authorization: `Bearer ${parsed.token}`,
+                    },
+                }
+            );
+
+            if (!response.ok) throw new Error();
+
+            const result = await response.json();
+
+            const saldoAPI = result?.contas?.[0]?.saldo;
+
+            if (saldoAPI !== undefined) {
+                setConta(prev =>
+                    prev ? { ...prev, saldo: saldoAPI } : prev
+                );
+            }
+
+        } catch (err) {
+            console.error("Erro ao atualizar saldo:", err);
+        }
+    }
+
+    async function buscarNomePorChave(chave: string) {
+        try {
+            const data = localStorage.getItem("data");
+            const parsed = data ? JSON.parse(data) : null;
+            const token = parsed?.token;
+            const response = await fetch(`https://api-atlasbank.onrender.com/chaves-pix/consultar/${chave}`, {
+                method: "GET",
+                headers: { "Authorization": `Bearer ${token}` }
+            });
+
+            const result = await response.json();
+
+            setNomesPix(prev => ({
+                ...prev,
+                [chave]: result.nome_recebedor
+            }));
+        } catch (err) {
+            console.error("Erro ao buscar nome da chave:", err);
+        }
+    }
+
+    useEffect(() => {
+        const chavesUnicas = Array.from(
+            new Set(
+                transacoes
+                    .filter(t => t.chave_pix)
+                    .map(t => t.chave_pix)
+            )
+        );
+
+        chavesUnicas.forEach(chave => {
+            if (!nomesPix[chave]) {
+                buscarNomePorChave(chave);
+            }
+        });
+    }, [transacoes, nomesPix]);
+
     function pedirConfirmacaoExclusao(chave: string) {
         setDialog({
             isOpen: true,
             type: 'confirm',
             title: 'Excluir chave?',
             message: `Você tem certeza que deseja remover a chave ${chave}? Essa ação não pode ser desfeita.`,
-            onConfirm: () => executarExclusaoChave(chave) // Executa isso se clicar em "Sim"
+            onConfirm: () => executarExclusaoChave(chave)
         });
     }
 
     async function executarExclusaoChave(chave: string) {
-        setDialog({ ...dialog, isOpen: false }); // Fecha o modal de confirmação
+        setDialog({ ...dialog, isOpen: false });
         try {
-            const token = localStorage.getItem("token");
+            const data = localStorage.getItem("data");
+            const parsed = data ? JSON.parse(data) : null;
+            const token = parsed?.token;
             const response = await fetch(`https://api-atlasbank.onrender.com/chaves-pix/${chave}`, {
                 method: "DELETE",
                 headers: { "Authorization": `Bearer ${token}` }
@@ -151,21 +226,17 @@ export default function PixPage() {
 
             setMinhasChaves(minhasChaves.filter(c => c.chave !== chave));
 
-            // Aviso de sucesso simpático
             setDialog({
                 isOpen: true,
                 type: 'success',
                 title: 'Chave removida',
                 message: 'Sua chave Pix foi excluída com sucesso da sua conta.'
             });
-        } catch (error: any) {
-            setDialog({ isOpen: true, type: 'error', title: 'Erro', message: error.message });
+        } catch (error: unknown) {
+            setDialog({ isOpen: true, type: 'error', title: 'Erro', message: (error as ApiError)?.message || "Erro desconhecido." });
         }
     }
 
-    // ==========================================
-    // ENVIO DE PIX (Dividido em 2 partes)
-    // ==========================================
     async function prepararEnvioPix() {
         if (!chaveDestino || !valorPix) {
             setDialog({ isOpen: true, type: 'error', title: 'Atenção', message: "Por favor, preencha a chave Pix e o valor antes de avançar." });
@@ -173,34 +244,37 @@ export default function PixPage() {
         }
         setLoadingPix(true);
         try {
-            const token = localStorage.getItem("token");
+            const data = localStorage.getItem("data");
+            const parsed = data ? JSON.parse(data) : null;
+            const token = parsed?.token;
             const resChave = await fetch(`https://api-atlasbank.onrender.com/chaves-pix/consultar/${chaveDestino}`, {
                 headers: { "Authorization": `Bearer ${token}` }
             });
             const dataChave = await resChave.json();
             if (!resChave.ok) throw new Error(dataChave.error || "Chave não encontrada.");
 
-            // Em vez de window.confirm, chamamos nosso modal customizado
             setDialog({
                 isOpen: true,
                 type: 'confirm',
                 title: 'Confirmar Transferência',
                 message: `Você está prestes a transferir ${formatarMoeda(Number(valorPix))} para ${dataChave.nome_recebedor}. Deseja confirmar esta operação?`,
-                onConfirm: () => executarEnvioPix(dataChave.numero_conta_destino)
+                onConfirm: () => executarEnvioPix()
             });
 
-        } catch (error: any) {
-            setDialog({ isOpen: true, type: 'error', title: 'Erro na consulta', message: error.message });
+        } catch (error: unknown) {
+            setDialog({ isOpen: true, type: 'error', title: 'Erro na consulta', message: (error as ApiError)?.message || "Erro desconhecido." });
         } finally {
             setLoadingPix(false);
         }
     }
 
-    async function executarEnvioPix(numeroContaDestino: string) {
+    async function executarEnvioPix() {
         setDialog({ ...dialog, isOpen: false });
         setLoadingPix(true);
         try {
-            const token = localStorage.getItem("token");
+            const data = localStorage.getItem("data");
+            const parsed = data ? JSON.parse(data) : null;
+            const token = parsed?.token;
             const response = await fetch("https://api-atlasbank.onrender.com/transacoes/pix", {
                 method: "POST",
                 headers: {
@@ -208,8 +282,8 @@ export default function PixPage() {
                     "Content-Type": "application/json"
                 },
                 body: JSON.stringify({
-                    conta_origem: usuario.numero_conta,
-                    conta_destino: numeroContaDestino,
+                    usuario_id: usuario?.usuario_id,
+                    chave: chaveDestino,
                     valor: Number(valorPix),
                     descricao: `Pix para a chave: ${chaveDestino}`
                 })
@@ -225,11 +299,11 @@ export default function PixPage() {
                 type: 'success',
                 title: 'Transferência Concluída!',
                 message: 'O Pix foi enviado com sucesso e já está na conta do recebedor.',
-                onConfirm: () => window.location.reload() // Recarrega ao fechar o sucesso
+                onConfirm: () => window.location.reload()
             });
 
-        } catch (error: any) {
-            setDialog({ isOpen: true, type: 'error', title: 'Falha na transferência', message: error.message });
+        } catch (error: unknown) {
+            setDialog({ isOpen: true, type: 'error', title: 'Falha na transferência', message: (error as ApiError)?.message || "Erro desconhecido." });
         } finally {
             setLoadingPix(false);
         }
@@ -239,25 +313,45 @@ export default function PixPage() {
         return Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
     }
 
-    if (isLoading || !usuario) return <div className="min-h-screen bg-[#050505] flex items-center justify-center text-[#CFAA56]">Carregando...</div>;
+    useEffect(() => {
+        if (!isLoading) {
+            verSaldo();
+        }
+    }, [isLoading]);
+
+    if (isLoading || !usuario || !conta) {
+        return (
+            <AppLayout
+                title="Pix"
+                subtitle="Envie dinheiro instantaneamente via Chave Pix"
+                user={usuario}
+                conta={conta}
+            >
+                <div className="min-h-screen bg-[#050505] flex flex-col items-center justify-center text-[#CFAA56]">
+                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#CFAA56] mb-4"></div>
+                    <p>Carregando informações do Pix...</p>
+                </div>
+            </AppLayout>
+        );
+    }
 
     const possuiCPF = minhasChaves.some(c => c.tipo_chave === 'CPF');
     const possuiEmail = minhasChaves.some(c => c.tipo_chave === 'EMAIL');
     const possuiTelefone = minhasChaves.some(c => c.tipo_chave === 'TELEFONE');
 
     return (
-        <AppLayout title="Pix" subtitle="Envie dinheiro instantaneamente via Chave Pix" user={usuario}>
-            <div className="flex justify-end mb-6">
-                <button onClick={handleLogout} className="flex items-center gap-2 px-4 py-2 rounded-xl border border-red-500/20 text-red-400 hover:bg-red-500/10 transition-colors text-sm font-medium">
-                    <FiLogOut /> Sair da conta
-                </button>
-            </div>
+        <AppLayout
+            title="Pix"
+            subtitle="Envie dinheiro instantaneamente via Chave Pix"
+            user={usuario}
+            conta={conta}
+        >
 
             <div className="grid md:grid-cols-3 gap-6 mb-8">
                 <div className="md:col-span-1 bg-[#0A0A0A] border border-white/5 rounded-3xl p-6 flex flex-col justify-center">
                     <p className="text-gray-400 text-sm mb-2">Saldo disponível</p>
                     <h2 className="text-3xl font-bold text-[#CFAA56]">
-                        {formatarMoeda(usuario.saldo_disponivel || 0)}
+                        {formatarMoeda(conta?.saldo || 0)}
                     </h2>
                 </div>
 
@@ -300,12 +394,12 @@ export default function PixPage() {
                             ) : (
                                 <div className="space-y-3">
                                     {minhasChaves.map((chave) => (
-                                        <div key={chave._id} className="flex justify-between items-center bg-white/[0.02] border border-white/[0.05] p-4 rounded-xl">
+                                        <div key={chave.id} className="flex justify-between items-center bg-white/[0.02] border border-white/[0.05] p-4 rounded-xl">
                                             <div>
                                                 <p className="font-bold text-[#CFAA56]">{chave.chave}</p>
                                                 <p className="text-xs text-gray-500 uppercase">{chave.tipo_chave}</p>
                                             </div>
-                                            <button onClick={() => pedirConfirmacaoExclusao(chave.chave)} className="text-red-500/50 hover:text-red-500 transition p-2">
+                                            <button onClick={() => chave.chave && pedirConfirmacaoExclusao(chave.chave)} className="text-red-500/50 hover:text-red-500 transition p-2">
                                                 <FaTrash />
                                             </button>
                                         </div>
@@ -386,27 +480,33 @@ export default function PixPage() {
                 <h3 className="text-xl font-bold mb-6">Últimas movimentações</h3>
                 <div className="space-y-4">
                     {transacoes.length > 0 ? (
-                        transacoes.map((t: any) => {
-                            // Descobre se a conta logada foi a origem da transferência
-                            const isSaida = String(t.conta_origem) === String(usuario.numero_conta);
+                        transacoes.map((t: Transacao) => {
+                            const isSaida = String(t.conta_origem) === String(conta?.numero_conta);
 
-                            // Formata a data bonitinha (se não tiver data, não quebra)
-                            const rawDate = t.data_transacao || t.createdAt;
-                            const formattedDate = rawDate ? new Date(rawDate).toLocaleString('pt-BR', {
-                                day: '2-digit', month: '2-digit', year: 'numeric',
-                                hour: '2-digit', minute: '2-digit'
-                            }) : '';
+                            const formattedDate = t.createdAt
+                                ? new Date(t.createdAt).toLocaleString('pt-BR', {
+                                    day: '2-digit',
+                                    month: '2-digit',
+                                    year: 'numeric',
+                                    hour: '2-digit',
+                                    minute: '2-digit'
+                                })
+                                : '';
 
-                            // O Back-end envia o 'nome_envolvido'. Se não enviar, mostramos o número da conta como fallback.
-                            const nomePessoa = t.nome_envolvido ? t.nome_envolvido : (isSaida ? `Conta ${t.conta_destino}` : `Conta ${t.conta_origem}`);
+                            const nomeViaChave = t.chave_pix ? nomesPix[t.chave_pix] : null;
 
-                            // Textos dinâmicos!
+                            const nomePessoa = nomeViaChave
+                                ? nomeViaChave
+                                : isSaida
+                                    ? `Conta ${t.conta_destino}`
+                                    : `Conta ${t.conta_origem}`;
+
                             const titulo = isSaida ? "Pix Enviado" : "Pix Recebido";
                             const descricao = isSaida ? `Para: ${nomePessoa}` : `De: ${nomePessoa}`;
 
                             return (
                                 <PixItem
-                                    key={t._id}
+                                    key={t.id_transacao}
                                     name={titulo}
                                     description={descricao}
                                     date={formattedDate}

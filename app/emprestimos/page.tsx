@@ -2,63 +2,53 @@
 
 import { useState, useEffect, ChangeEvent } from "react";
 import { useRouter } from "next/navigation";
+
 import AppLayout from "../components/AppLayout";
-import { FiDollarSign, FiTrendingUp, FiClock, FiCheckCircle, FiLogOut } from "react-icons/fi";
+import { UsuarioAPI } from "@/types/Usuario";
+import { Conta } from "@/types/Conta";
+
+import { FiDollarSign, FiTrendingUp, FiClock, FiCheckCircle } from "react-icons/fi";
 import { EmprestimosInputProps, LoanItemProps, SummaryCardProps } from "@/types/Emprestimos";
+
 
 export default function EmprestimosPage() {
     const router = useRouter();
     const [valor, setValor] = useState("");
     const [parcelas, setParcelas] = useState("12");
     const [isLoading, setIsLoading] = useState(true);
-    const [usuario, setUsuario] = useState<any>(null);
+    const [usuario, setUsuario] = useState<UsuarioAPI | null>(null);
+    const [conta, setConta] = useState<Conta | null>(null);
 
-    // ==========================================
-    // 1. VERIFICAÇÃO DE LOGIN E BUSCA DE DADOS
-    // ==========================================
     useEffect(() => {
-        const token = localStorage.getItem("token");
+        const data = localStorage.getItem("data");
 
-        if (!token) {
+        if (!data) {
             router.push("/login");
             return;
         }
 
-        async function carregarDados() {
-            try {
-                const response = await fetch("https://api-atlasbank.onrender.com/usuarios/meus-dados", {
-                    method: "GET",
-                    headers: {
-                        "Authorization": `Bearer ${token}`,
-                        "Content-Type": "application/json",
-                    },
-                });
+        try {
+            const parsedData = JSON.parse(data);
 
-                if (!response.ok) {
-                    throw new Error("Sessão inválida ou expirada.");
-                }
+            const token = parsedData.token;
+            const usuario: UsuarioAPI = parsedData.usuario;
+            const conta: Conta = parsedData.conta;
 
-                const data = await response.json();
-                setUsuario(data);
-            } catch (error) {
-                console.error("ERRO EM EMPRÉSTIMOS:", error);
-                localStorage.removeItem("token");
+            if (!token || !usuario || !conta) {
+                localStorage.removeItem("data");
                 router.push("/login");
-            } finally {
-                setIsLoading(false);
+                return;
             }
+
+            setUsuario(usuario);
+            setConta(conta);
+        } catch {
+            localStorage.removeItem("data");
+            router.push("/login");
+        } finally {
+            setIsLoading(false);
         }
-
-        carregarDados();
     }, [router]);
-
-    // ==========================================
-    // 2. FUNÇÃO DE LOGOUT
-    // ==========================================
-    function handleLogout() {
-        localStorage.removeItem("token");
-        router.push("/login");
-    }
 
     // Função auxiliar para formatar moeda
     const formatarMoeda = (valor: number) => {
@@ -77,10 +67,17 @@ export default function EmprestimosPage() {
     // Tela de loading
     if (isLoading || !usuario) {
         return (
-            <div className="min-h-screen bg-[#050505] flex flex-col items-center justify-center text-[#CFAA56]">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#CFAA56] mb-4"></div>
-                <p>Analisando propostas de crédito...</p>
-            </div>
+            <AppLayout
+                title="Empréstimos"
+                subtitle="Simule e contrate crédito com facilidade"
+                user={usuario}
+                conta={conta}
+            >
+                <div className="min-h-screen bg-[#050505] flex flex-col items-center justify-center text-[#CFAA56]">
+                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#CFAA56] mb-4"></div>
+                    <p>Analisando propostas de crédito...</p>
+                </div>
+            </AppLayout>
         );
     }
 
@@ -89,17 +86,8 @@ export default function EmprestimosPage() {
             title="Empréstimos"
             subtitle="Simule e contrate crédito com facilidade"
             user={usuario}
+            conta={conta}
         >
-            {/* BOTÃO DE LOGOUT */}
-            <div className="flex justify-end mb-6">
-                <button 
-                    onClick={handleLogout}
-                    className="flex items-center gap-2 px-4 py-2 rounded-xl border border-red-500/20 text-red-400 hover:bg-red-500/10 transition-colors text-sm font-medium"
-                >
-                    <FiLogOut /> Sair da conta
-                </button>
-            </div>
-
             {/* RESUMO DINÂMICO */}
             <div className="grid md:grid-cols-3 gap-6 mb-8">
                 <SummaryCard

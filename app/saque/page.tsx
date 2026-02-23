@@ -2,8 +2,12 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+
 import AppLayout from "../components/AppLayout";
-import { FiInfo, FiCheckCircle, FiAlertTriangle, FiLogOut } from "react-icons/fi";
+import { UsuarioAPI } from "@/types/Usuario";
+import { Conta } from "@/types/Conta";
+
+import { FiInfo, FiCheckCircle, FiAlertTriangle } from "react-icons/fi";
 
 type DialogConfig = {
     isOpen: boolean;
@@ -14,7 +18,8 @@ type DialogConfig = {
 
 export default function SaquePage() {
     const router = useRouter();
-    const [usuario, setUsuario] = useState<any>(null);
+    const [usuario, setUsuario] = useState<UsuarioAPI | null>(null);
+    const [conta, setConta] = useState<Conta | null>(null);
     const [valor, setValor] = useState("");
     const [descricao, setDescricao] = useState("");
     const [loading, setLoading] = useState(false);
@@ -28,40 +33,56 @@ export default function SaquePage() {
     });
 
     useEffect(() => {
-        const token = localStorage.getItem("token");
+        const data = localStorage.getItem("data");
 
-        if (!token) {
+        if (!data) {
             router.push("/login");
             return;
         }
 
-        async function carregarUsuario() {
-            try {
-                const res = await fetch(
-                    "https://api-atlasbank.onrender.com/usuarios/meus-dados",
-                    {
-                        headers: { Authorization: `Bearer ${token}` },
-                    }
-                );
-
-                if (!res.ok) throw new Error("Sessão expirada");
-
-                const data = await res.json();
-                setUsuario(data);
-            } catch (error) {
-                localStorage.removeItem("token");
-                router.push("/login");
-            } finally {
-                setIsLoading(false);
-            }
+        try {
+            const parsedData = JSON.parse(data);
+            setUsuario(parsedData.usuario);
+            setConta(parsedData.conta);
+        } catch (err) {
+            console.error(err);
+            localStorage.removeItem("data");
+            router.push("/login");
+        } finally {
+            setIsLoading(false);
         }
-
-        carregarUsuario();
     }, [router]);
 
-    function handleLogout() {
-        localStorage.removeItem("token");
-        router.push("/login");
+    async function verSaldo() {
+        const data = localStorage.getItem("data");
+        if (!data) return;
+
+        const parsed = JSON.parse(data);
+
+        try {
+            const response = await fetch(
+                `https://api-atlasbank.onrender.com/contas/${parsed.usuario.usuario_id}`,
+                {
+                    headers: {
+                        Authorization: `Bearer ${parsed.token}`,
+                    },
+                }
+            );
+
+            if (!response.ok) throw new Error();
+
+            const result = await response.json();
+            const saldoAPI = result?.contas?.[0]?.saldo;
+
+            if (saldoAPI !== undefined) {
+                setConta(prev =>
+                    prev ? { ...prev, saldo: saldoAPI } : prev
+                );
+            }
+
+        } catch (err) {
+            console.error("Erro ao atualizar saldo:", err);
+        }
     }
 
     const formatarMoeda = (valor: number) => {
@@ -82,7 +103,7 @@ export default function SaquePage() {
             return;
         }
 
-        if (Number(valor) > usuario.saldo_disponivel) {
+        if (!conta || Number(valor) > conta.saldo) {
             setDialog({
                 isOpen: true,
                 type: "error",
@@ -95,7 +116,9 @@ export default function SaquePage() {
         setLoading(true);
 
         try {
-            const token = localStorage.getItem("token");
+            const data = localStorage.getItem("data");
+            const parsed = data ? JSON.parse(data) : null;
+            const token = parsed?.token;
 
             const response = await fetch(
                 "https://api-atlasbank.onrender.com/transacoes/saque",
@@ -106,9 +129,9 @@ export default function SaquePage() {
                         "Content-Type": "application/json",
                     },
                     body: JSON.stringify({
-                        conta_origem: usuario.numero_conta,
+                        usuario_id: usuario?.usuario_id,
                         valor: Number(valor),
-                        descricao: descricao || "Saque simulado",
+                        descricao: descricao || "Saque realizado",
                     }),
                 }
             );
@@ -125,26 +148,42 @@ export default function SaquePage() {
                 message: "O valor foi debitado com sucesso da sua conta.",
             });
 
+            await verSaldo();
+
             setValor("");
             setDescricao("");
 
-        } catch (error: any) {
+        } catch (error: unknown) {
             setDialog({
                 isOpen: true,
                 type: "error",
                 title: "Erro",
-                message: error.message,
+                message: error instanceof Error ? error.message : "Erro desconhecido",
             });
         } finally {
             setLoading(false);
         }
     }
 
+    useEffect(() => {
+        if (usuario) {
+            verSaldo();
+        }
+    }, [usuario]);
+
     if (isLoading || !usuario)
         return (
-            <div className="min-h-screen bg-[#050505] flex items-center justify-center text-[#CFAA56]">
-                Carregando...
-            </div>
+            <AppLayout
+                title="Saque"
+                subtitle="Retire saldo da sua conta"
+                user={usuario}
+                conta={conta}
+            >
+                <div className="min-h-screen bg-[#050505] flex items-center justify-center text-[#CFAA56]">
+                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#CFAA56] mb-4"></div>
+                    Carregando dados do usuário...
+                </div>
+            </AppLayout>
         );
 
     return (
@@ -152,15 +191,18 @@ export default function SaquePage() {
             title="Saque"
             subtitle="Retire saldo da sua conta"
             user={usuario}
+            conta={conta}
         >
-            {/* Logout */}
-            <div className="flex justify-end mb-6">
-                <button
-                    onClick={handleLogout}
-                    className="flex items-center gap-2 px-4 py-2 rounded-xl border border-red-500/20 text-red-400 hover:bg-red-500/10 transition-colors text-sm font-medium"
-                >
-                    <FiLogOut /> Sair da conta
-                </button>
+            {/* Aviso */}
+            <div className="bg-[#111] border border-[#CFAA56]/30 rounded-3xl p-6 mb-8 flex gap-4">
+                <div className="text-[#CFAA56] mt-1">
+                    <FiInfo size={22} />
+                </div>
+                <p className="text-base md:text-lg text-gray-300 leading-relaxed">
+                    Esta funcionalidade simula uma operação de saque,
+                    representando a saída de saldo da conta do cliente
+                    para fins de teste e demonstração do sistema.
+                </p>
             </div>
 
             {/* Saldo */}
@@ -169,20 +211,8 @@ export default function SaquePage() {
                     Saldo disponível
                 </p>
                 <h2 className="text-3xl font-bold text-[#CFAA56]">
-                    {formatarMoeda(usuario.saldo_disponivel || 0)}
+                    {formatarMoeda(conta?.saldo || 0)}
                 </h2>
-            </div>
-
-            {/* Aviso */}
-            <div className="bg-[#111] border border-[#CFAA56]/30 rounded-3xl p-6 mb-8 flex gap-4">
-                <div className="text-[#CFAA56] mt-1">
-                    <FiInfo size={22} />
-                </div>
-                <p className="text-sm text-gray-300 leading-relaxed">
-                    ⓘ Esta funcionalidade simula uma operação de saque,
-                    representando a saída de saldo da conta do cliente
-                    para fins de teste e demonstração do sistema.
-                </p>
             </div>
 
             {/* Formulário */}
@@ -243,8 +273,7 @@ export default function SaquePage() {
 
                         <button
                             onClick={() => {
-                                setDialog({ ...dialog, isOpen: false });
-                                window.location.reload();
+                                setDialog(prev => ({ ...prev, isOpen: false }));
                             }}
                             className="w-full py-3 rounded-xl bg-white/10 text-white font-bold hover:bg-white/20 transition"
                         >

@@ -3,6 +3,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Usuario } from "@/types/Usuario";
 import { FiArrowLeft, FiLock, FiMail, FiMapPin, FiUser, FiPhone, FiHash, FiCalendar } from "react-icons/fi";
 import { InputProps } from "@/types/Input";
@@ -12,6 +13,8 @@ const TOTAL_STEPS = 3;
 export default function CadastroPage() {
   const [step, setStep] = useState(1);
   const [mensagem, setMensagem] = useState("");
+
+  const router = useRouter();
 
   const [form, setForm] = useState<Usuario>({
     nome_completo: "",
@@ -44,11 +47,21 @@ export default function CadastroPage() {
         body: JSON.stringify(form),
       });
       const data = await response.json();
-      if (!response.ok) setMensagem(data.error);
-      else setMensagem(data.message);
+      if (!response.ok) {
+        setMensagem(data.error);
+      } else {
+        localStorage.setItem("token", data.token);
+        setMensagem("Cadastro realizado com sucesso!");
+        router.push("/painel");
+      }
     } catch {
       setMensagem("Erro ao conectar com o servidor.");
     }
+  }
+
+  if (typeof window !== "undefined" && localStorage.getItem("token")) {
+    router.push("/painel");
+    return null;
   }
 
   const progress = (step / TOTAL_STEPS) * 100;
@@ -103,7 +116,7 @@ export default function CadastroPage() {
                     {step === 3 && "Segurança"}
                   </h2>
                 </div>
-               
+
               </div>
               <div className="w-full h-[2px] bg-white/5 rounded-full overflow-hidden">
                 <div

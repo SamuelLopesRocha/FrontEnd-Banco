@@ -2,71 +2,125 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import AppLayout from "../components/AppLayout";
 import Link from "next/link";
 
-import { FiDollarSign, FiCreditCard, FiShoppingBag, FiLogOut } from "react-icons/fi";
+import AppLayout from "../components/AppLayout";
+import { UsuarioAPI } from "@/types/Usuario";
+import { Conta } from "@/types/Conta";
+import { Transacao, TransacaoAPI } from "@/types/Extrato";
+
+import { FiDollarSign, FiCreditCard, FiShoppingBag } from "react-icons/fi";
 import { FaPix, FaChartLine, FaPlus } from "react-icons/fa6";
 import { ActionButtonProps, SaldoCardProps, TransactionProps } from "@/types/Painel";
 
 export default function PainelPage() {
     const router = useRouter();
     const [isLoading, setIsLoading] = useState(true);
-    const [usuario, setUsuario] = useState<any>(null);
+    const [usuario, setUsuario] = useState<UsuarioAPI | null>(null);
+    const [conta, setConta] = useState<Conta | null>(null);
+    const [transacoes, setTransacoes] = useState<Transacao[]>([]);
 
-    // ==========================================
-    // 1. VERIFICAÇÃO DE LOGIN E BUSCA DE DADOS
-    // ==========================================
     useEffect(() => {
-        const token = localStorage.getItem("token");
+        const data = localStorage.getItem("data");
 
-        if (!token) {
+        if (!data) {
             router.push("/login");
             return;
         }
 
-        async function carregarDados() {
-            try {
-                const response = await fetch("https://api-atlasbank.onrender.com/usuarios/meus-dados", {
-                    method: "GET",
-                    headers: {
-                        "Authorization": `Bearer ${token}`,
-                        "Content-Type": "application/json",
-                    },
-                });
+        try {
+            const parsedData = JSON.parse(data);
 
-                if (!response.ok) {
-                    throw new Error("Sessão inválida ou expirada.");
-                }
+            const token = parsedData.token;
+            const usuario: UsuarioAPI = parsedData.usuario;
+            const conta: Conta = parsedData.conta;
 
-                const data = await response.json();
-                setUsuario(data);
-            } catch (error) {
-                console.error("ERRO NO PAINEL:", error);
-                localStorage.removeItem("token");
+            if (!token || !usuario || !conta) {
+                localStorage.removeItem("data");
                 router.push("/login");
-            } finally {
-                setIsLoading(false);
+                return;
             }
-        }
 
-        carregarDados();
+            setUsuario(usuario);
+            setConta(conta);
+        } catch {
+            localStorage.removeItem("data");
+            router.push("/login");
+        } finally {
+            setIsLoading(false);
+        }
     }, [router]);
 
-    // ==========================================
-    // 2. FUNÇÃO DE LOGOUT
-    // ==========================================
-    function handleLogout() {
-        localStorage.removeItem("token");
-        router.push("/login");
+    async function verSaldo() {
+        const data = localStorage.getItem("data");
+        if (!data) return;
+
+        const parsed = JSON.parse(data);
+
+        try {
+            const response = await fetch(
+                `https://api-atlasbank.onrender.com/contas/${parsed.usuario.usuario_id}`,
+                {
+                    headers: {
+                        Authorization: `Bearer ${parsed.token}`,
+                    },
+                }
+            );
+
+            if (!response.ok) throw new Error();
+
+            const result = await response.json();
+
+            const saldoAPI = result?.contas?.[0]?.saldo;
+
+            if (saldoAPI !== undefined) {
+                setConta(prev =>
+                    prev ? { ...prev, saldo: saldoAPI } : prev
+                );
+            }
+
+        } catch (err) {
+            console.error("Erro ao atualizar saldo:", err);
+        }
     }
 
-    // Função auxiliar para formatar moeda
+    async function verTransacoes() {
+        const data = localStorage.getItem("data");
+        if (!data) return;
+
+        const parsed = JSON.parse(data);
+
+        try {
+            const response = await fetch(
+                `https://api-atlasbank.onrender.com/transacoes`,
+                {
+                    headers: {
+                        Authorization: `Bearer ${parsed.token}`,
+                    },
+                }
+            );
+
+            if (!response.ok) throw new Error();
+
+            const result: TransacaoAPI = await response.json();
+            setTransacoes(result.dados);
+
+        } catch (err) {
+            console.error("Erro ao buscar transações:", err);
+        }
+    }
+
     const formatarMoeda = (valor: number) => {
         return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(valor);
     };
 
-    // Tela de loading enquanto busca os dados
+    useEffect(() => {
+        if (!isLoading) {
+            verSaldo();
+            verTransacoes();
+        }
+    }, [isLoading]);
+
     if (isLoading || !usuario) {
         return (
             <div className="min-h-screen bg-[#050505] flex flex-col items-center justify-center text-[#CFAA56]">
@@ -77,27 +131,20 @@ export default function PainelPage() {
     }
 
     return (
-        <AppLayout user={usuario}
-        
-            
+        <AppLayout
+            user={usuario}
+            conta={conta}
+            title="Bem-vindo de volta"
+            subtitle="Aqui está o resumo da sua conta"
         >
-            {/* BOTÃO DE LOGOUT TOPO DIREITO (Exemplo de onde colocar) */}
-            <div className="flex justify-end mb-6">
-                <button 
-                    onClick={handleLogout}
-                    className="flex items-center gap-2 px-4 py-2 rounded-xl border border-red-500/20 text-red-400 hover:bg-red-500/10 transition-colors text-sm font-medium"
-                >
-                    <FiLogOut /> Sair da conta
-                </button>
-            </div>
 
             {/* SALDOS */}
             <div className="grid gap-4 md:grid-cols-2 mb-6 md:mb-10">
                 <SaldoCard
                     title="Saldo disponível"
-                    value={formatarMoeda(usuario.saldo_disponivel || 0)}
+                    value={formatarMoeda(conta?.saldo || 0)}
                 />
-                
+
             </div>
 
             {/* AÇÕES */}
@@ -125,27 +172,23 @@ export default function PainelPage() {
                 </div>
 
                 <div className="space-y-2 max-h-[280px] overflow-y-auto pr-1">
-                    {/* Exemplo de como renderizar uma lista de transações se elas vierem da API */}
-                    {usuario.movimentacoes && usuario.movimentacoes.length > 0 ? (
-                        usuario.movimentacoes.map((mov: any, index: number) => (
+                    {transacoes.length > 0 ? (
+                        transacoes.map((mov, index) => (
                             <Transaction
                                 key={index}
-                                name={mov.nome}
-                                date={mov.data}
-                                category={mov.categoria}
-                                value={mov.valor}
+                                name={mov.tipo}
+                                date={new Date(mov.createdAt).toLocaleDateString("pt-BR")}
+                                category={mov.descricao}
+                                value={
+                                    mov.tipo === "DEPOSITO"
+                                        ? `+${mov.valor}`
+                                        : `-${mov.valor}`
+                                }
                             />
                         ))
                     ) : (
                         <p className="text-gray-500 text-center py-4 text-sm">Nenhuma movimentação recente.</p>
                     )}
-
-                    {/* Deixei as transações fixas abaixo comentadas caso não tenha a API pronta ainda */}
-                    {/*
-                    <Transaction name="Supermercado" date="Hoje • 14:32" category="Alimentação" value="-230,00" />
-                    <Transaction name="Salário" date="Ontem" category="Receita" value="+3500,00" />
-                    <Transaction name="Netflix" date="12 Mai" category="Assinaturas" value="-39,90" />
-                    */}
                 </div>
             </div>
         </AppLayout>
@@ -200,9 +243,8 @@ function ActionButton({ icon, label, href, disabled = false }: ActionButtonProps
 }
 
 function Transaction({ name, date, category, value }: TransactionProps) {
-    // Ajuste simples para garantir que funciona tanto com string (+300) quanto com número
     const valueString = String(value);
-    const positive = valueString.includes("+");
+    const positivo = valueString.includes("+");
 
     return (
         <div className="flex items-center justify-between p-3 rounded-xl hover:bg-white/5 transition-all">
@@ -218,10 +260,10 @@ function Transaction({ name, date, category, value }: TransactionProps) {
                 </div>
             </div>
             <span
-                className={`font-semibold text-sm ${positive ? "text-green-400" : "text-red-400"
+                className={`font-semibold text-sm ${positivo ? "text-green-400" : "text-red-400"
                     }`}
             >
-                {positive ? "+" : "-"} R$ {valueString.replace(/[+-]/, "")}
+                {positivo ? "+" : "-"} R$ {Math.abs(Number(valueString)).toFixed(2)}
             </span>
         </div>
     );

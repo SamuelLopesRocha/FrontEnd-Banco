@@ -11,21 +11,25 @@ import { NavItemProps, MobileNavProps } from "@/types/Layout";
 import { FiHome, FiDollarSign, FiCreditCard, FiLogOut, FiShoppingBag, FiMenu, FiX } from "react-icons/fi";
 import { FaRobot, FaChartLine, FaPix } from "react-icons/fa6";
 import { PiHandCoinsBold } from "react-icons/pi";
+import { Conta } from "@/types/Conta";
 
 type Props = {
     children: React.ReactNode;
     title?: string;
     subtitle?: string;
-    user?: any;
+    user?: {
+        nome_completo: string;
+    } | null;
+    conta?: Conta | null;
 };
 
-export default function AppLayout({ children, title, subtitle, user }: Props) {
+export default function AppLayout({ children, title, subtitle, user, conta }: Props) {
     const router = useRouter();
     const pathname = usePathname();
     const [menuOpen, setMenuOpen] = useState(false);
 
     function logout() {
-        localStorage.removeItem("token");
+        localStorage.removeItem("data");
         router.push("/login");
     }
 
@@ -86,12 +90,11 @@ export default function AppLayout({ children, title, subtitle, user }: Props) {
                     <div className="flex items-center gap-3 ml-auto">
                         <div className="text-right hidden sm:block">
                             <p className="text-sm font-bold">
-                                {/* 3. Pega o primeiro nome do banco de dados */}
                                 {user?.nome_completo ? user.nome_completo.split(" ")[0] : "Carregando..."}
                             </p>
                             <p className="text-xs text-gray-500 capitalize">
-                                {/* 4. Pega o tipo de conta (Corrente/Black/etc) */}
-                                Conta {user?.tipo_conta?.toLowerCase() || "Conta Corrente"}
+
+                                Conta {conta?.tipo_conta?.toLowerCase() || "Conta Corrente"}
                             </p>
                         </div>
 

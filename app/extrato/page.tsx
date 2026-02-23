@@ -1,103 +1,174 @@
 "use client";
 
-import { Transacao } from "@/types/Extrato";
+import { useRouter } from "next/navigation";
+import { useState, useEffect, ChangeEvent, useMemo } from "react";
+
 import AppLayout from "../components/AppLayout";
-import { useState, ChangeEvent, useMemo } from "react";
+import { UsuarioAPI } from "@/types/Usuario";
+import { Conta } from "@/types/Conta";
+import { Transacao, TransacaoAPI } from "@/types/Extrato";
+
 import { FiArrowDown, FiArrowUp, FiSearch } from "react-icons/fi";
 
-const DATA: Transacao[] = [
-    { id: 1, descricao: "Pix Recebido", valor: 820, data: "2026-02-10", tipo: "entrada" },
-    { id: 2, descricao: "Mercado", valor: -120, data: "2026-02-09", tipo: "saida" },
-    { id: 3, descricao: "Salário", valor: 4200, data: "2026-02-05", tipo: "entrada" },
-    { id: 4, descricao: "Netflix", valor: -39, data: "2026-01-28", tipo: "saida" },
-];
-
 export default function ExtratoPage() {
+    const router = useRouter();
+
+    const [loading, setLoading] = useState(true);
+    const [usuario, setUsuario] = useState<UsuarioAPI | null>(null);
+    const [conta, setConta] = useState<Conta | null>(null);
+    const [transacoes, setTransacoes] = useState<Transacao[]>([]);
+
     const [busca, setBusca] = useState("");
     const [tipo, setTipo] = useState<"todos" | "entrada" | "saida">("todos");
     const [periodo, setPeriodo] = useState("30");
 
+    useEffect(() => {
+        async function init() {
+            const data = localStorage.getItem("data");
+
+            if (!data) {
+                router.push("/login");
+                return;
+            }
+
+            try {
+                const parsed = JSON.parse(data);
+
+                if (!parsed.token || !parsed.usuario || !parsed.conta) {
+                    localStorage.removeItem("data");
+                    router.push("/login");
+                    return;
+                }
+
+                setUsuario(parsed.usuario);
+                setConta(parsed.conta);
+
+                const response = await fetch(
+                    `https://api-atlasbank.onrender.com/transacoes`,
+                    {
+                        headers: {
+                            Authorization: `Bearer ${parsed.token}`,
+                        },
+                    }
+                );
+
+                if (!response.ok) throw new Error();
+
+                const result: TransacaoAPI = await response.json();
+                setTransacoes(result.dados);
+
+            } catch (err) {
+                console.error(err);
+                router.push("/login");
+            } finally {
+                setLoading(false);
+            }
+        }
+
+        init();
+    }, [router]);
+
     const filtrado = useMemo(() => {
         const hoje = new Date();
 
-        return DATA.filter((t) => {
-            const dataTransacao = new Date(t.data);
+        return transacoes.filter((t) => {
+            const dataTransacao = new Date(t.createdAt);
 
             const dentroPeriodo =
-                (hoje.getTime() - dataTransacao.getTime()) / (1000 * 60 * 60 * 24)
-                <= Number(periodo);
+                (hoje.getTime() - dataTransacao.getTime()) /
+                (1000 * 60 * 60 * 24) <= Number(periodo);
 
-            const tipoOk = tipo === "todos" || t.tipo === tipo;
+            const ehEntrada = t.tipo === "DEPOSITO";
+            const ehSaida = !ehEntrada;
+
+            const tipoOk =
+                tipo === "todos" ||
+                (tipo === "entrada" && ehEntrada) ||
+                (tipo === "saida" && ehSaida);
 
             const buscaOk =
                 t.descricao.toLowerCase().includes(busca.toLowerCase());
 
             return dentroPeriodo && tipoOk && buscaOk;
         });
-    }, [busca, tipo, periodo]);
+    }, [transacoes, busca, tipo, periodo]);
+
+    if (loading || !usuario || !conta) {
+        return (
+            <AppLayout 
+                title="Extrato"
+                subtitle="Acompanhe suas movimentações"
+                user={usuario}
+                conta={conta}
+            >
+                <div className="min-h-screen bg-[#050505] flex flex-col items-center justify-center text-[#CFAA56]">
+                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#CFAA56] mb-4"></div>
+                    <p>Carregando seu extrato...</p>
+                </div>
+            </AppLayout>
+        );
+    }
 
     return (
         <AppLayout
+            user={usuario}
+            conta={conta}
             title="Extrato"
             subtitle="Acompanhe suas movimentações"
         >
-
             {/* FILTROS */}
             <div className="bg-[#0A0A0A] border border-white/5 rounded-3xl p-5 mb-6">
 
                 <div className="grid md:grid-cols-3 gap-4">
 
-                    {/* BUSCA */}
                     <div className="relative">
                         <FiSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500" />
-
                         <input
                             placeholder="Buscar transação"
                             value={busca}
                             onChange={(e: ChangeEvent<HTMLInputElement>) => setBusca(e.target.value)}
-                            className="w-full pl-10 pr-4 py-3 rounded-xl bg-white/[0.02] border border-white/[0.06] text-sm text-white outline-none" />
+                            className="w-full pl-10 pr-4 py-3 rounded-xl bg-white/[0.02] border border-white/[0.06] text-sm outline-none"
+                        />
                     </div>
 
-                    {/* TIPO */}
                     <select
                         value={tipo}
                         onChange={(e) => setTipo(e.target.value as "todos" | "entrada" | "saida")}
-                        className="px-4 py-3 rounded-xl bg-white/[0.02] border border-white/[0.06] text-sm">
-                        <option className="bg-[#0A0A0A]" value="todos">Todos</option>
-                        <option className="bg-[#0A0A0A]" value="entrada">Entradas</option>
-                        <option className="bg-[#0A0A0A]" value="saida">Saídas</option>
+                        className="px-4 py-3 rounded-xl bg-white/[0.02] border border-white/[0.06] text-sm"
+                    >
+                        <option className="bg-[#050505]" value="todos">Todos</option>
+                        <option className="bg-[#050505]" value="entrada">Entradas</option>
+                        <option className="bg-[#050505]" value="saida">Saídas</option>
                     </select>
 
-                    {/* PERIODO */}
                     <select
                         value={periodo}
                         onChange={(e) => setPeriodo(e.target.value)}
-                        className="px-4 py-3 rounded-xl bg-white/[0.02] border border-white/[0.06] text-sm">
-                        <option className="bg-[#0A0A0A]" value="7">7 dias</option>
-                        <option className="bg-[#0A0A0A]" value="30">30 dias</option>
-                        <option className="bg-[#0A0A0A]" value="90">90 dias</option>
-                        <option className="bg-[#0A0A0A]" value="365">1 ano</option>
+                        className="px-4 py-3 rounded-xl bg-white/[0.02] border border-white/[0.06] text-sm"
+                    >
+                        <option className="bg-[#050505]" value="7">7 dias</option>
+                        <option className="bg-[#050505]" value="30">30 dias</option>
+                        <option className="bg-[#050505]" value="90">90 dias</option>
+                        <option className="bg-[#050505]" value="365">1 ano</option>
                     </select>
 
                 </div>
             </div>
 
-
             {/* LISTA */}
             <div className="bg-[#0A0A0A] border border-white/5 rounded-3xl overflow-hidden">
 
-                {filtrado.length === 0 && (
+                {filtrado.length === 0 ? (
                     <p className="text-center py-12 text-gray-500">
                         Nenhuma transação encontrada
                     </p>
+                ) : (
+                    filtrado.map((t) => (
+                        <TransacaoItem key={t.id_transacao} t={t} />
+                    ))
                 )}
 
-                {filtrado.map((t) => (
-                    <TransacaoItem key={t.id} t={t} />
-                ))}
-
             </div>
-
         </AppLayout>
     );
 }
@@ -105,28 +176,27 @@ export default function ExtratoPage() {
 /* ---------- COMPONENTES ---------- */
 
 function TransacaoItem({ t }: { t: Transacao }) {
-    const positivo = t.valor > 0;
+    const positivo = t.tipo === "DEPOSITO";
 
     return (
         <div className="flex justify-between items-center px-6 py-4 border-b border-white/[0.03] hover:bg-white/[0.02] transition">
 
             <div className="flex items-center gap-4">
-
                 <div className={`w-10 h-10 rounded-lg flex items-center justify-center
-          ${positivo
+                    ${positivo
                         ? "bg-green-500/15 text-green-400"
-                        : "bg-red-500/15 text-red-400"}
-        `}>
+                        : "bg-red-500/15 text-red-400"
+                    }`}
+                >
                     {positivo ? <FiArrowDown /> : <FiArrowUp />}
                 </div>
 
                 <div>
                     <p className="font-medium">{t.descricao}</p>
                     <p className="text-xs text-gray-500">
-                        {new Date(t.data).toLocaleDateString()}
+                        {new Date(t.createdAt).toLocaleDateString("pt-BR")}
                     </p>
                 </div>
-
             </div>
 
             <span className={`font-bold ${positivo ? "text-green-400" : "text-red-400"}`}>

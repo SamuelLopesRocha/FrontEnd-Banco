@@ -15,7 +15,7 @@ export default function LoginPage() {
     email: "",
     senha: "",
   });
-  
+
   const [mensagem, setMensagem] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -42,7 +42,8 @@ export default function LoginPage() {
       if (!response.ok) {
         setMensagem(data.error || "Falha no login");
       } else {
-        localStorage.setItem("token", data.token);
+        localStorage.setItem("data", JSON.stringify(data));
+
         setMensagem("Login realizado com sucesso!");
         router.push("/painel");
       }
@@ -51,6 +52,11 @@ export default function LoginPage() {
     } finally {
       setLoading(false);
     }
+  }
+
+  if (typeof window !== "undefined" && localStorage.getItem("token")) {
+    router.push("/painel");
+    return null;
   }
 
   return (

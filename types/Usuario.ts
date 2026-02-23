@@ -13,3 +13,12 @@ export interface Usuario {
   senha?: string;
   status_conta?: string;
 }
+
+export type UsuarioAPI = {
+  usuario_id: number;
+  nome_completo: string;
+  cpf: string;
+  email: string;
+  telefone: string;
+  status_conta: string;
+};

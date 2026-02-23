@@ -3,7 +3,9 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import AppLayout from "../components/AppLayout";
-import { FiInfo, FiCheckCircle, FiAlertTriangle, FiLogOut } from "react-icons/fi";
+import { FiInfo, FiCheckCircle, FiAlertTriangle } from "react-icons/fi";
+import { UsuarioAPI } from "@/types/Usuario";
+import { Conta } from "@/types/Conta";
 
 type DialogConfig = {
     isOpen: boolean;
@@ -14,9 +16,13 @@ type DialogConfig = {
 
 export default function DepositoPage() {
     const router = useRouter();
-    const [usuario, setUsuario] = useState<any>(null);
+
+    const [usuario, setUsuario] = useState<UsuarioAPI | null>(null);
+    const [conta, setConta] = useState<Conta | null>(null);
+
     const [valor, setValor] = useState("");
     const [descricao, setDescricao] = useState("");
+
     const [loading, setLoading] = useState(false);
     const [isLoading, setIsLoading] = useState(true);
 
@@ -28,51 +34,69 @@ export default function DepositoPage() {
     });
 
     useEffect(() => {
-        const token = localStorage.getItem("token");
+        const carregarDados = () => {
+            const data = localStorage.getItem("data");
 
-        if (!token) {
-            router.push("/login");
-            return;
-        }
+            if (!data) {
+                router.push("/login");
+                return;
+            }
 
-        async function carregarUsuario() {
             try {
-                const res = await fetch(
-                    "https://api-atlasbank.onrender.com/usuarios/meus-dados",
-                    {
-                        headers: { Authorization: `Bearer ${token}` },
-                    }
-                );
-
-                if (!res.ok) throw new Error("Sessão expirada");
-
-                const data = await res.json();
-                setUsuario(data);
-            } catch (error) {
-                localStorage.removeItem("token");
+                const parsed = JSON.parse(data);
+                setUsuario(parsed.usuario);
+                setConta(parsed.conta);
+            } catch {
+                localStorage.removeItem("data");
                 router.push("/login");
             } finally {
                 setIsLoading(false);
             }
-        }
+        };
 
-        carregarUsuario();
+        carregarDados();
     }, [router]);
 
-    function handleLogout() {
-        localStorage.removeItem("token");
-        router.push("/login");
+    async function verSaldo() {
+        const data = localStorage.getItem("data");
+        if (!data) return;
+
+        const parsed = JSON.parse(data);
+
+        try {
+            const response = await fetch(
+                `https://api-atlasbank.onrender.com/contas/${parsed.usuario.usuario_id}`,
+                {
+                    headers: {
+                        Authorization: `Bearer ${parsed.token}`,
+                    },
+                }
+            );
+
+            if (!response.ok) throw new Error();
+
+            const result = await response.json();
+            const saldoAPI = result?.contas?.[0]?.saldo;
+
+            if (saldoAPI !== undefined) {
+                setConta(prev =>
+                    prev ? { ...prev, saldo: saldoAPI } : prev
+                );
+            }
+
+        } catch (err) {
+            console.error("Erro ao atualizar saldo:", err);
+        }
     }
 
-    const formatarMoeda = (valor: number) => {
-        return new Intl.NumberFormat("pt-BR", {
+    const formatarMoeda = (valor: number) =>
+        new Intl.NumberFormat("pt-BR", {
             style: "currency",
             currency: "BRL",
         }).format(valor);
-    };
 
     async function handleDeposito() {
-        if (!valor || Number(valor) <= 0) {
+        if (!valor || Number(valor) <= 0 || !conta) {
             setDialog({
                 isOpen: true,
                 type: "error",
@@ -85,18 +109,21 @@ export default function DepositoPage() {
         setLoading(true);
 
         try {
-            const token = localStorage.getItem("token");
+            const data = localStorage.getItem("data");
+            if (!data) return router.push("/login");
+
+            const parsed = JSON.parse(data);
 
             const response = await fetch(
                 "https://api-atlasbank.onrender.com/transacoes/deposito",
                 {
                     method: "POST",
                     headers: {
-                        Authorization: `Bearer ${token}`,
+                        Authorization: `Bearer ${parsed.token}`,
                         "Content-Type": "application/json",
                     },
                     body: JSON.stringify({
-                        conta_origem: usuario.numero_conta,
+                        conta_origem: conta.numero_conta,
                         valor: Number(valor),
                         descricao: descricao || "Depósito simulado",
                     }),
@@ -108,6 +135,10 @@ export default function DepositoPage() {
                 throw new Error(result.error || "Erro ao realizar depósito");
             }
 
+            setConta(prev =>
+                prev ? { ...prev, saldo: (prev.saldo || 0) + Number(valor) } : prev
+            );
+
             setDialog({
                 isOpen: true,
                 type: "success",
@@ -118,68 +149,68 @@ export default function DepositoPage() {
             setValor("");
             setDescricao("");
 
-        } catch (error: any) {
+        } catch (error: unknown) {
             setDialog({
                 isOpen: true,
                 type: "error",
                 title: "Erro",
-                message: error.message,
+                message: error instanceof Error ? error.message : "Erro desconhecido",
             });
         } finally {
             setLoading(false);
         }
     }
 
-    if (isLoading || !usuario)
+    useEffect(() => {
+        if (usuario) {
+            verSaldo();
+        }
+    }, [usuario]);
+
+    if (isLoading || !usuario) {
         return (
-            <div className="min-h-screen bg-[#050505] flex items-center justify-center text-[#CFAA56]">
-                Carregando...
-            </div>
+            <AppLayout
+                title="Depósito"
+                subtitle="Adicione saldo à sua conta"
+                user={usuario}
+                conta={conta}
+            >
+                <div className="min-h-screen bg-[#050505] flex items-center justify-center text-[#CFAA56]">
+                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#CFAA56] mb-4"></div>
+                    Carregando dados do usuário...
+                </div>
+            </AppLayout>
         );
+    }
 
     return (
         <AppLayout
             title="Depósito"
             subtitle="Adicione saldo à sua conta"
             user={usuario}
+            conta={conta}
         >
-            {/* Logout */}
-            <div className="flex justify-end mb-6">
-                <button
-                    onClick={handleLogout}
-                    className="flex items-center gap-2 px-4 py-2 rounded-xl border border-red-500/20 text-red-400 hover:bg-red-500/10 transition-colors text-sm font-medium"
-                >
-                    <FiLogOut /> Sair da conta
-                </button>
-            </div>
-
-            {/* Aviso (AGORA ACIMA DO SALDO) */}
+            {/* Aviso */}
             <div className="bg-[#111] border border-[#CFAA56]/30 rounded-3xl p-6 mb-8 flex gap-4">
                 <div className="text-[#CFAA56] mt-1">
                     <FiInfo size={22} />
                 </div>
                 <p className="text-base md:text-lg text-gray-300 leading-relaxed">
-                    ⓘ Esta funcionalidade simula uma operação de depósito,
-                    representando a entrada de saldo na conta do cliente
-                    para fins de teste e demonstração do sistema.
+                    Esta funcionalidade simula uma operação de depósito, onde o valor é creditado na sua conta para fins de teste e demonstração do sistema.
                 </p>
             </div>
 
             {/* Saldo */}
             <div className="bg-[#0A0A0A] border border-white/5 rounded-3xl p-6 mb-8">
-                <p className="text-gray-400 text-sm mb-2">
-                    Saldo disponível
-                </p>
+                <p className="text-gray-400 text-sm mb-2">Saldo disponível</p>
                 <h2 className="text-3xl font-bold text-[#CFAA56]">
-                    {formatarMoeda(usuario.saldo_disponivel || 0)}
+                    {formatarMoeda(conta?.saldo || 0)}
                 </h2>
             </div>
 
             {/* Formulário */}
             <div className="bg-[#0A0A0A] border border-white/5 rounded-3xl p-6">
-                <h3 className="text-lg font-bold mb-4">
-                    Realizar Depósito
-                </h3>
+                <h3 className="text-lg font-bold mb-4">Realizar Depósito</h3>
 
                 <div className="grid gap-4">
                     <input
@@ -210,33 +241,24 @@ export default function DepositoPage() {
 
             {/* Modal */}
             {dialog.isOpen && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md">
                     <div className="bg-[#0A0A0A] border border-white/10 w-full max-w-sm rounded-3xl p-6 text-center">
                         <div className="flex justify-center mb-4">
                             {dialog.type === "success" ? (
-                                <div className="w-16 h-16 rounded-full bg-green-500/20 text-green-400 flex items-center justify-center">
-                                    <FiCheckCircle size={32} />
-                                </div>
+                                <FiCheckCircle size={36} className="text-green-400" />
                             ) : (
-                                <div className="w-16 h-16 rounded-full bg-red-500/20 text-red-400 flex items-center justify-center">
-                                    <FiAlertTriangle size={32} />
-                                </div>
+                                <FiAlertTriangle size={36} className="text-red-400" />
                             )}
                         </div>
 
-                        <h3 className="text-xl font-bold mb-2 text-white">
-                            {dialog.title}
-                        </h3>
-                        <p className="text-gray-400 text-sm mb-6">
-                            {dialog.message}
-                        </p>
+                        <h3 className="text-xl font-bold mb-2">{dialog.title}</h3>
+                        <p className="text-gray-400 mb-6">{dialog.message}</p>
 
                         <button
-                            onClick={() => {
-                                setDialog({ ...dialog, isOpen: false });
-                                window.location.reload();
-                            }}
-                            className="w-full py-3 rounded-xl bg-white/10 text-white font-bold hover:bg-white/20 transition"
+                            onClick={() =>
+                                setDialog(prev => ({ ...prev, isOpen: false }))
+                            }
+                            className="w-full py-3 rounded-xl bg-white/10 hover:bg-white/20"
                         >
                             Entendi
                         </button>
