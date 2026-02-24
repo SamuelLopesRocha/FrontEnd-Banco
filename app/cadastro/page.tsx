@@ -50,7 +50,7 @@ export default function CadastroPage() {
       if (!response.ok) {
         setMensagem(data.error);
       } else {
-        localStorage.setItem("token", data.token);
+        localStorage.setItem("data", JSON.stringify(data));
         setMensagem("Cadastro realizado com sucesso!");
         router.push("/painel");
       }
@@ -59,7 +59,7 @@ export default function CadastroPage() {
     }
   }
 
-  if (typeof window !== "undefined" && localStorage.getItem("token")) {
+  if (typeof window !== "undefined" && localStorage.getItem("data")) {
     router.push("/painel");
     return null;
   }

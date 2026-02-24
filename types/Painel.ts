@@ -13,6 +13,7 @@ export interface ActionButtonProps {
 }
 
 export interface TransactionProps {
+  tipo: string;
   name: string;
   date: string;
   category: string;

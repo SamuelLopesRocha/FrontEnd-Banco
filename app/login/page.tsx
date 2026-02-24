@@ -54,7 +54,7 @@ export default function LoginPage() {
     }
   }
 
-  if (typeof window !== "undefined" && localStorage.getItem("token")) {
+  if (typeof window !== "undefined" && localStorage.getItem("data")) {
     router.push("/painel");
     return null;
   }

@@ -1,14 +1,14 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState, useEffect, ChangeEvent, useMemo } from "react";
+import { useState, useEffect, ChangeEvent, useMemo, useCallback } from "react";
 
 import AppLayout from "../components/AppLayout";
 import { UsuarioAPI } from "@/types/Usuario";
 import { Conta } from "@/types/Conta";
 import { Transacao, TransacaoAPI } from "@/types/Extrato";
 
-import { FiArrowDown, FiArrowUp, FiSearch } from "react-icons/fi";
+import { FiArrowDownLeft, FiArrowUpRight, FiSearch } from "react-icons/fi";
 
 export default function ExtratoPage() {
     const router = useRouter();
@@ -18,9 +18,45 @@ export default function ExtratoPage() {
     const [conta, setConta] = useState<Conta | null>(null);
     const [transacoes, setTransacoes] = useState<Transacao[]>([]);
 
+    const [pagina, setPagina] = useState(1);
+    const [totalPaginas, setTotalPaginas] = useState(1);
+
     const [busca, setBusca] = useState("");
     const [tipo, setTipo] = useState<"todos" | "entrada" | "saida">("todos");
     const [periodo, setPeriodo] = useState("30");
+
+    const buscarTransacoes = useCallback(async (page: number) => {
+        const data = localStorage.getItem("data");
+        if (!data) {
+            router.push("/login");
+            return;
+        }
+
+        const parsed = JSON.parse(data);
+
+        const response = await fetch(
+            `https://api-atlasbank.onrender.com/transacoes?page=${page}&limit=10`,
+            {
+                headers: {
+                    Authorization: `Bearer ${parsed.token}`,
+                },
+            }
+        );
+
+        if (response.status === 401) {
+            localStorage.removeItem("data");
+            router.push("/login");
+            return;
+        }
+
+        if (!response.ok) throw new Error("Erro ao buscar transações");
+
+        const result: TransacaoAPI = await response.json();
+
+        setTransacoes(result.dados);
+        setPagina(result.pagina);
+        setTotalPaginas(result.total_paginas);
+    }, [router]);
 
     useEffect(() => {
         async function init() {
@@ -43,19 +79,7 @@ export default function ExtratoPage() {
                 setUsuario(parsed.usuario);
                 setConta(parsed.conta);
 
-                const response = await fetch(
-                    `https://api-atlasbank.onrender.com/transacoes`,
-                    {
-                        headers: {
-                            Authorization: `Bearer ${parsed.token}`,
-                        },
-                    }
-                );
-
-                if (!response.ok) throw new Error();
-
-                const result: TransacaoAPI = await response.json();
-                setTransacoes(result.dados);
+                await buscarTransacoes(pagina);
 
             } catch (err) {
                 console.error(err);
@@ -66,7 +90,7 @@ export default function ExtratoPage() {
         }
 
         init();
-    }, [router]);
+    }, [buscarTransacoes, pagina, router]);
 
     const filtrado = useMemo(() => {
         const hoje = new Date();
@@ -78,7 +102,9 @@ export default function ExtratoPage() {
                 (hoje.getTime() - dataTransacao.getTime()) /
                 (1000 * 60 * 60 * 24) <= Number(periodo);
 
-            const ehEntrada = t.tipo === "DEPOSITO";
+            const ehEntrada =
+                t.tipo === "DEPOSITO" || t.tipo === "PIX_RECEBIMENTO";
+
             const ehSaida = !ehEntrada;
 
             const tipoOk =
@@ -95,13 +121,13 @@ export default function ExtratoPage() {
 
     if (loading || !usuario || !conta) {
         return (
-            <AppLayout 
+            <AppLayout
                 title="Extrato"
                 subtitle="Acompanhe suas movimentações"
                 user={usuario}
                 conta={conta}
             >
-                <div className="min-h-screen bg-[#050505] flex flex-col items-center justify-center text-[#CFAA56]">
+                <div className="min-h-screen flex flex-col items-center justify-center text-[#CFAA56]">
                     <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#CFAA56] mb-4"></div>
                     <p>Carregando seu extrato...</p>
                 </div>
@@ -118,7 +144,6 @@ export default function ExtratoPage() {
         >
             {/* FILTROS */}
             <div className="bg-[#0A0A0A] border border-white/5 rounded-3xl p-5 mb-6">
-
                 <div className="grid md:grid-cols-3 gap-4">
 
                     <div className="relative">
@@ -151,13 +176,11 @@ export default function ExtratoPage() {
                         <option className="bg-[#050505]" value="90">90 dias</option>
                         <option className="bg-[#050505]" value="365">1 ano</option>
                     </select>
-
                 </div>
             </div>
 
             {/* LISTA */}
             <div className="bg-[#0A0A0A] border border-white/5 rounded-3xl overflow-hidden">
-
                 {filtrado.length === 0 ? (
                     <p className="text-center py-12 text-gray-500">
                         Nenhuma transação encontrada
@@ -167,7 +190,29 @@ export default function ExtratoPage() {
                         <TransacaoItem key={t.id_transacao} t={t} />
                     ))
                 )}
+            </div>
 
+            {/* PAGINAÇÃO */}
+            <div className="flex justify-center items-center gap-4 py-6">
+                <button
+                    onClick={() => setPagina((prev) => Math.max(prev - 1, 1))}
+                    disabled={pagina === 1}
+                    className="px-4 py-2 rounded-xl bg-[#141414] border border-white/10 disabled:opacity-40"
+                >
+                    Anterior
+                </button>
+
+                <span className="text-sm text-gray-400">
+                    Página {pagina} de {totalPaginas}
+                </span>
+
+                <button
+                    onClick={() => setPagina((prev) => Math.min(prev + 1, totalPaginas))}
+                    disabled={pagina === totalPaginas}
+                    className="px-4 py-2 rounded-xl bg-[#141414] border border-white/10 disabled:opacity-40"
+                >
+                    Próxima
+                </button>
             </div>
         </AppLayout>
     );
@@ -176,19 +221,20 @@ export default function ExtratoPage() {
 /* ---------- COMPONENTES ---------- */
 
 function TransacaoItem({ t }: { t: Transacao }) {
-    const positivo = t.tipo === "DEPOSITO";
+    const positivo = t.tipo === "DEPOSITO" || t.tipo === "PIX_RECEBIMENTO";
 
     return (
         <div className="flex justify-between items-center px-6 py-4 border-b border-white/[0.03] hover:bg-white/[0.02] transition">
 
             <div className="flex items-center gap-4">
-                <div className={`w-10 h-10 rounded-lg flex items-center justify-center
+                <div
+                    className={`w-10 h-10 rounded-lg flex items-center justify-center
                     ${positivo
-                        ? "bg-green-500/15 text-green-400"
-                        : "bg-red-500/15 text-red-400"
-                    }`}
+                            ? "bg-green-500/15 text-green-400"
+                            : "bg-red-500/15 text-red-400"
+                        }`}
                 >
-                    {positivo ? <FiArrowDown /> : <FiArrowUp />}
+                    {positivo ? <FiArrowDownLeft /> : <FiArrowUpRight />}
                 </div>
 
                 <div>

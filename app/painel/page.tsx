@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 
@@ -9,7 +9,7 @@ import { UsuarioAPI } from "@/types/Usuario";
 import { Conta } from "@/types/Conta";
 import { Transacao, TransacaoAPI } from "@/types/Extrato";
 
-import { FiDollarSign, FiCreditCard, FiShoppingBag } from "react-icons/fi";
+import { FiDollarSign, FiCreditCard, FiShoppingBag, FiArrowDownLeft, FiArrowUpRight } from "react-icons/fi";
 import { FaPix, FaChartLine, FaPlus } from "react-icons/fa6";
 import { ActionButtonProps, SaldoCardProps, TransactionProps } from "@/types/Painel";
 
@@ -51,7 +51,12 @@ export default function PainelPage() {
         }
     }, [router]);
 
-    async function verSaldo() {
+    const logoutPorTokenInvalido = useCallback(() => {
+        localStorage.removeItem("data");
+        router.push("/login");
+    }, [router]);
+
+    const verSaldo = useCallback(async () => {
         const data = localStorage.getItem("data");
         if (!data) return;
 
@@ -66,6 +71,11 @@ export default function PainelPage() {
                     },
                 }
             );
+
+            if (response.status === 401) {
+                logoutPorTokenInvalido();
+                return;
+            }
 
             if (!response.ok) throw new Error();
 
@@ -82,9 +92,9 @@ export default function PainelPage() {
         } catch (err) {
             console.error("Erro ao atualizar saldo:", err);
         }
-    }
+    }, [logoutPorTokenInvalido]);
 
-    async function verTransacoes() {
+    const verTransacoes = useCallback(async () => {
         const data = localStorage.getItem("data");
         if (!data) return;
 
@@ -100,6 +110,11 @@ export default function PainelPage() {
                 }
             );
 
+            if (response.status === 401) {
+                logoutPorTokenInvalido();
+                return;
+            }
+
             if (!response.ok) throw new Error();
 
             const result: TransacaoAPI = await response.json();
@@ -108,7 +123,7 @@ export default function PainelPage() {
         } catch (err) {
             console.error("Erro ao buscar transações:", err);
         }
-    }
+    }, [logoutPorTokenInvalido]);
 
     const formatarMoeda = (valor: number) => {
         return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(valor);
@@ -119,7 +134,7 @@ export default function PainelPage() {
             verSaldo();
             verTransacoes();
         }
-    }, [isLoading]);
+    }, [isLoading, verSaldo, verTransacoes]);
 
     if (isLoading || !usuario) {
         return (
@@ -174,7 +189,6 @@ export default function PainelPage() {
                 <div className="space-y-2 max-h-[280px] overflow-y-auto pr-1">
                     {transacoes.length > 0 ? (
                         transacoes.map((mov, index) => {
-                            // Lógica para descobrir se o dinheiro entrou ou saiu
                             let isEntrada = false;
 
                             if (mov.tipo === "DEPOSITO" || mov.tipo === "PIX_RECEBIMENTO") {
@@ -182,20 +196,19 @@ export default function PainelPage() {
                             } else if (mov.tipo === "SAQUE" || mov.tipo === "PIX_ENVIO") {
                                 isEntrada = false;
                             } else {
-                                // Fallback de segurança: se a conta destino for a sua, é entrada.
                                 isEntrada = String(mov.conta_destino) === String(conta?.numero_conta);
                             }
 
-                            // Força o sinal de + ou - no valor antes de passar pro componente
                             const valorFormatado = isEntrada ? `+${mov.valor}` : `-${mov.valor}`;
 
                             return (
                                 <Transaction
                                     key={index}
-                                    name={mov.tipo.replace("_", " ")} // Troca PIX_RECEBIMENTO por "PIX RECEBIMENTO"
+                                    tipo={mov.tipo}
+                                    name={mov.tipo.replace("_", " ")}
                                     date={new Date(mov.createdAt).toLocaleDateString("pt-BR")}
                                     category={mov.descricao || "Transferência"}
-                                    value={valorFormatado} // Envia a string já com o sinal correto!
+                                    value={valorFormatado}
                                 />
                             );
                         })
@@ -208,7 +221,7 @@ export default function PainelPage() {
     );
 }
 
-/* ---------- COMPONENTES (MANTIDOS IGUAIS) ---------- */
+/* ---------- COMPONENTES ---------- */
 
 function SaldoCard({ title, value }: SaldoCardProps) {
     return (
@@ -255,25 +268,57 @@ function ActionButton({ icon, label, href, disabled = false }: ActionButtonProps
     );
 }
 
-function Transaction({ name, date, category, value }: TransactionProps) {
+function getIconByTipo(tipo: string) {
+    switch (tipo) {
+        case "PIX_ENVIO":
+        case "PIX_RECEBIMENTO":
+            return <FaPix />;
+
+        case "DEPOSITO":
+            return <FiArrowDownLeft />;
+
+        case "SAQUE":
+            return <FiArrowUpRight />;
+
+        case "PAGAMENTO":
+            return <FiCreditCard />;
+
+        case "COMPRA":
+            return <FiShoppingBag />;
+
+        default:
+            return <FiDollarSign />;
+    }
+}
+
+function Transaction({ tipo, name, date, category, value }: TransactionProps) {
     const valueString = String(value);
     const positivo = valueString.includes("+");
 
     return (
         <div className="flex items-center justify-between p-3 rounded-xl hover:bg-white/5 transition-all">
-            <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full flex items-center justify-center bg-gradient-to-br from-[#CFAA56]/30 to-transparent text-[#F4E3B2] font-bold">
-                    {name[0]}
+            <div className="flex items-center gap-4">
+                <div
+                    title={name}
+                    className={`w-10 h-10 rounded-lg flex items-center justify-center
+                    ${positivo
+                            ? "bg-green-500/15 text-green-400"
+                            : "bg-red-500/15 text-red-400"
+                        }`}
+                >
+                    {getIconByTipo(tipo)}
                 </div>
+
                 <div>
-                    <p className="font-medium text-sm">{name}</p>
-                    <p className="text-xs text-gray-400">
-                        {category} • {date}
+                    <p className="font-medium">{category}</p>
+                    <p className="text-xs text-gray-500">
+                        {date}
                     </p>
                 </div>
             </div>
+
             <span
-                className={`font-semibold text-sm ${positivo ? "text-green-400" : "text-red-400"
+                className={`font-semibold md:text-base text-sm ${positivo ? "text-green-400" : "text-red-400"
                     }`}
             >
                 {positivo ? "+" : "-"} R$ {Math.abs(Number(valueString)).toFixed(2)}
@@ -281,4 +326,3 @@ function Transaction({ name, date, category, value }: TransactionProps) {
         </div>
     );
 }
-
