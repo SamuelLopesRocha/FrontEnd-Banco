@@ -71,7 +71,10 @@ export default function PixPage() {
                 });
                 if (resTrans.ok) {
                     const result: TransacaoAPI = await resTrans.json();
-                    setTransacoes(result.dados);
+                    
+                    // 🔥 A MÁGICA ACONTECE AQUI: Filtramos para manter apenas as do tipo "PIX"
+                    const apenasPix = result.dados.filter((t: Transacao) => t.tipo === "PIX_ENVIO" || t.tipo === "PIX_RECEBIMENTO");
+                    setTransacoes(apenasPix);
                 }
 
                 const resChaves = await fetch("https://api-atlasbank.onrender.com/chaves-pix", {

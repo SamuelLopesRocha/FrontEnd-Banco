@@ -173,19 +173,32 @@ export default function PainelPage() {
 
                 <div className="space-y-2 max-h-[280px] overflow-y-auto pr-1">
                     {transacoes.length > 0 ? (
-                        transacoes.map((mov, index) => (
-                            <Transaction
-                                key={index}
-                                name={mov.tipo}
-                                date={new Date(mov.createdAt).toLocaleDateString("pt-BR")}
-                                category={mov.descricao}
-                                value={
-                                    mov.tipo === "DEPOSITO"
-                                        ? `+${mov.valor}`
-                                        : `-${mov.valor}`
-                                }
-                            />
-                        ))
+                        transacoes.map((mov, index) => {
+                            // Lógica para descobrir se o dinheiro entrou ou saiu
+                            let isEntrada = false;
+
+                            if (mov.tipo === "DEPOSITO" || mov.tipo === "PIX_RECEBIMENTO") {
+                                isEntrada = true;
+                            } else if (mov.tipo === "SAQUE" || mov.tipo === "PIX_ENVIO") {
+                                isEntrada = false;
+                            } else {
+                                // Fallback de segurança: se a conta destino for a sua, é entrada.
+                                isEntrada = String(mov.conta_destino) === String(conta?.numero_conta);
+                            }
+
+                            // Força o sinal de + ou - no valor antes de passar pro componente
+                            const valorFormatado = isEntrada ? `+${mov.valor}` : `-${mov.valor}`;
+
+                            return (
+                                <Transaction
+                                    key={index}
+                                    name={mov.tipo.replace("_", " ")} // Troca PIX_RECEBIMENTO por "PIX RECEBIMENTO"
+                                    date={new Date(mov.createdAt).toLocaleDateString("pt-BR")}
+                                    category={mov.descricao || "Transferência"}
+                                    value={valorFormatado} // Envia a string já com o sinal correto!
+                                />
+                            );
+                        })
                     ) : (
                         <p className="text-gray-500 text-center py-4 text-sm">Nenhuma movimentação recente.</p>
                     )}

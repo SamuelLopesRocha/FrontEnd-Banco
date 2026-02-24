@@ -1,6 +1,7 @@
 import { ReactNode } from "react";
 
 export type Cartao = {
+    _id: string;
   id: number;
   numero_cartao: string;
   validade: string;
@@ -12,6 +13,7 @@ export type Cartao = {
 };
 
 export type CartaoAPI = {
+    _id: string;
     id_cartao: number;
     numero_cartao: string;
     tipo: string;
