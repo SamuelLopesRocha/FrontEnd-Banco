@@ -10,6 +10,7 @@ export type Cartao = {
   limite_credito: number;
   limite_utilizado: number;
   status_cartao: string;
+  cvv: string;
 };
 
 export type CartaoAPI = {
@@ -22,6 +23,7 @@ export type CartaoAPI = {
     validade: string;
     limite_credito: number;
     limite_utilizado: number;
+    cvv: string;
 };
 
 export interface CardActionProps {

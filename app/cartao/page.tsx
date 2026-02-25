@@ -7,7 +7,8 @@ import AppLayout from "../components/AppLayout";
 import { UsuarioAPI } from "@/types/Usuario";
 import { Conta } from "@/types/Conta";
 
-import { FiLock, FiSettings, FiPlus, FiTrash, FiX, FiCheckCircle, FiAlertTriangle, FiInfo } from "react-icons/fi";
+// 🔥 Adicionado o FiEye aqui
+import { FiLock, FiSettings, FiPlus, FiTrash, FiX, FiCheckCircle, FiAlertTriangle, FiInfo, FiEye } from "react-icons/fi";
 import { FaCreditCard } from "react-icons/fa6";
 import { CardActionProps, Cartao, CartaoAPI } from "@/types/Cartao";
 
@@ -29,7 +30,8 @@ function mapearCartaoAPI(api: CartaoAPI): Cartao {
         status_cartao: api.status_cartao,
         validade: api.validade,
         limite_credito: api.limite_credito ?? 0,
-        limite_utilizado: api.limite_utilizado ?? 0
+        limite_utilizado: api.limite_utilizado ?? 0,
+        cvv: api.cvv || "***" // 👈 Pega o CVV da API ou usa "***" como fallback
     };
 }
 
@@ -45,8 +47,9 @@ export default function CartoesPage() {
     // Estados dos Modais
     const [dialog, setDialog] = useState<DialogConfig>({ isOpen: false, type: 'success', title: '', message: '' });
     
-    // Estados do Modal de Limite
+    // Estados do Modal de Limite e Detalhes
     const [showLimitModal, setShowLimitModal] = useState(false);
+    const [showDetailsModal, setShowDetailsModal] = useState(false); // 🔥 Novo estado para o Modal de Dados
     const [novoLimite, setNovoLimite] = useState<string | number>("");
     const [isProcessing, setIsProcessing] = useState(false);
 
@@ -93,10 +96,9 @@ export default function CartoesPage() {
     }, [router]);
 
     // ==========================================
-    // CRIAR CARTÃO (COM TRAVA DE 5 CARTÕES)
+    // CRIAR CARTÃO
     // ==========================================
     async function novoCartao() {
-        // TRAVA: Máximo de 5 cartões
         if (cartoes.length >= 5) {
             setDialog({ 
                 isOpen: true, 
@@ -319,8 +321,11 @@ export default function CartoesPage() {
                         </div>
                     </div>
 
-                    {/* AÇÕES */}
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 mb-10">
+                    {/* AÇÕES (Agora com 5 botões e grid responsivo) */}
+                    <div className="grid grid-cols-2 md:grid-cols-5 gap-3 md:gap-4 mb-10">
+                        {/* 🔥 Novo botão de Ver Dados */}
+                        <CardAction icon={<FiEye />} label="Ver Dados" onClick={() => setShowDetailsModal(true)} />
+                        
                         <CardAction
                             icon={<FiLock />}
                             label={selecionado.status_cartao === "ATIVO" ? "Bloquear" : "Desbloquear"}
@@ -357,6 +362,55 @@ export default function CartoesPage() {
                 </>
             )}
 
+            {/* 🔥 NOVO MODAL: DADOS DO CARTÃO */}
+            {showDetailsModal && selecionado && (
+                <div className="fixed inset-0 z-40 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in">
+                    <div className="bg-[#111] border border-white/10 w-full max-w-sm rounded-3xl p-6 shadow-2xl">
+                        <div className="flex justify-between items-center mb-6">
+                            <h3 className="text-xl font-bold text-white">Dados do Cartão</h3>
+                            <button onClick={() => setShowDetailsModal(false)} className="text-gray-400 hover:text-white"><FiX size={24}/></button>
+                        </div>
+                        
+                        <div className="space-y-4">
+                            {/* Número do Cartão */}
+                            <div className="bg-[#0A0A0A] p-4 rounded-xl border border-white/5">
+                                <p className="text-xs text-gray-500 mb-1 uppercase tracking-wider font-medium">Número do Cartão</p>
+                                <p className="font-mono text-lg tracking-widest text-[#F4E3B2]">
+                                    {/* Adiciona um espaço a cada 4 números para ficar bonito */}
+                                    {selecionado.numero_cartao.match(/.{1,4}/g)?.join(' ') || selecionado.numero_cartao}
+                                </p>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-4">
+                                {/* Validade */}
+                                <div className="bg-[#0A0A0A] p-4 rounded-xl border border-white/5">
+                                    <p className="text-xs text-gray-500 mb-1 uppercase tracking-wider font-medium">Validade</p>
+                                    <p className="font-mono text-lg text-white">{selecionado.validade}</p>
+                                </div>
+                                {/* CVV */}
+                                <div className="bg-[#0A0A0A] p-4 rounded-xl border border-white/5">
+                                    <p className="text-xs text-gray-500 mb-1 uppercase tracking-wider font-medium">CVV</p>
+                                    <p className="font-mono text-lg text-white">{selecionado.cvv}</p>
+                                </div>
+                            </div>
+
+                            {/* Bandeira */}
+                            <div className="bg-[#0A0A0A] p-4 rounded-xl border border-white/5">
+                                <p className="text-xs text-gray-500 mb-1 uppercase tracking-wider font-medium">Bandeira</p>
+                                <p className="font-medium text-lg text-white capitalize">{selecionado.bandeira}</p>
+                            </div>
+                        </div>
+
+                        <button 
+                            onClick={() => setShowDetailsModal(false)} 
+                            className="mt-8 w-full py-4 rounded-xl bg-[#CFAA56] text-black font-bold hover:bg-[#e2bd6b] transition text-lg"
+                        >
+                            Fechar
+                        </button>
+                    </div>
+                </div>
+            )}
+
             {/* MODAL DE AJUSTAR LIMITE (ESTILO NUBANK) */}
             {showLimitModal && selecionado && (
                 <div className="fixed inset-0 z-40 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in">
@@ -366,7 +420,6 @@ export default function CartoesPage() {
                             <button onClick={() => setShowLimitModal(false)} className="text-gray-400 hover:text-white"><FiX size={24}/></button>
                         </div>
                         
-                        {/* Textos de Valor - Estilo Referência */}
                         <div className="text-center mb-8 mt-4">
                             <h2 className="text-4xl font-bold text-white mb-2">
                                 {formatarMoeda(Number(novoLimite))}
@@ -376,12 +429,11 @@ export default function CartoesPage() {
                             </p>
                         </div>
 
-                        {/* Barra Slider com bolinha */}
                         <div className="mb-6 px-2">
                             <input 
                                 type="range" 
                                 min={selecionado.limite_utilizado} 
-                                max={conta?.limite_credito || 10000} // Maximo baseado na conta ou num fallback
+                                max={selecionado.limite_credito || 10000} 
                                 step="10"
                                 value={novoLimite}
                                 onChange={(e) => setNovoLimite(e.target.value)}
@@ -389,11 +441,10 @@ export default function CartoesPage() {
                             />
                             <div className="flex justify-between text-xs text-gray-500 mt-3 font-medium">
                                 <span>0</span>
-                                <span>{formatarMoeda(conta?.limite_credito || 10000)}</span>
+                                <span>{formatarMoeda(selecionado.limite_credito || 10000)}</span>
                             </div>
                         </div>
 
-                        {/* Input Numérico Opcional */}
                         <div className="mb-8">
                             <label className="text-xs text-gray-500 mb-2 block font-medium">Ou digite o valor exato:</label>
                             <input 
