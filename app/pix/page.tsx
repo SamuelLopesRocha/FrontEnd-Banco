@@ -19,12 +19,14 @@ type DialogConfig = {
     onConfirm?: () => void;
 };
 
+// 🔥 Adicionado o status opcional no tipo
 type PagamentoPendente = {
     _id: string;
     valor: number;
     codigo_pix: string;
     createdAt: string;
     tipo: "unico" | "recorrente";
+    status?: string; 
 };
 
 export default function PixPage() {
@@ -94,9 +96,12 @@ export default function PixPage() {
                 });
                 if (resChaves.ok) setMinhasChaves(await resChaves.json());
 
-                // Busca as Cobranças Pendentes no BD
+                // 🔥 Busca as Cobranças Pendentes no BD e filtra APENAS as que estão "PENDENTE"
                 const resCobrancas = await fetch("https://api-atlasbank.onrender.com/cobrancas", { headers: { "Authorization": `Bearer ${token}` } });
-                if (resCobrancas.ok) setPagamentosPendentes(await resCobrancas.json());
+                if (resCobrancas.ok) {
+                    const cobrancasRaw = await resCobrancas.json();
+                    setPagamentosPendentes(cobrancasRaw.filter((c: PagamentoPendente) => c.status === 'PENDENTE'));
+                }
 
             } catch (error) {
                 console.error("ERRO NO PIX:", error);
@@ -113,9 +118,6 @@ export default function PixPage() {
         return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(valor);
     };
 
-    // ==================================================
-    // LEITOR BLINDADO DO COPIA E COLA
-    // ==================================================
     function handleChaveDestinoChange(e: React.ChangeEvent<HTMLInputElement>) {
         const val = e.target.value;
         setChaveDestino(val);
@@ -123,16 +125,14 @@ export default function PixPage() {
         if (val.startsWith("000201") && val.length > 30) {
             setIsPixCopiaECola(true);
             
-            // Procura a Tag exata de Moeda Real (5303986) seguida da Tag de Valor (54)
             const marker = "530398654"; 
             const indexMarker = val.indexOf(marker);
             
             if (indexMarker !== -1) {
-                const index54 = indexMarker + 7; // Aponta exatamente para o "54"
+                const index54 = indexMarker + 7;
                 const tamanhoValorStr = val.substring(index54 + 2, index54 + 4);
                 const tamanhoValor = parseInt(tamanhoValorStr, 10);
                 
-                // Recorta estritamente a quantidade de caracteres do valor (exclui o 5802)
                 const valorReal = val.substring(index54 + 4, index54 + 4 + tamanhoValor);
                 setValorPix(valorReal); 
             }
@@ -150,7 +150,6 @@ export default function PixPage() {
         
         let chaveParaConsultar = chaveDestino;
 
-        // Se for Copia e Cola, extraímos a chave lendo o tamanho exato
         if (isPixCopiaECola) {
             const indexPix01 = chaveDestino.indexOf("pix01");
             if (indexPix01 !== -1) {
@@ -176,7 +175,6 @@ export default function PixPage() {
             
             if (!resChave.ok) throw new Error(dataChave.error || "A chave contida neste QR Code não foi encontrada no banco de dados.");
 
-            // Trava para impedir enviar Pix para si mesmo
             if (String(dataChave.numero_conta_destino) === String(conta?.numero_conta)) {
                 throw new Error("Você não pode enviar um Pix para a sua própria conta.");
             }
@@ -186,7 +184,8 @@ export default function PixPage() {
                 type: 'confirm',
                 title: 'Confirmar Transferência',
                 message: `Você está prestes a transferir ${formatarMoeda(Number(valorPix))} para ${dataChave.nome_recebedor}. Deseja confirmar?`,
-                onConfirm: () => executarEnvioPix(chaveParaConsultar)
+                // 🔥 Se for Copia e Cola, nós enviamos o código gigante inteiro também para poder dar a baixa nele
+                onConfirm: () => executarEnvioPix(chaveParaConsultar, isPixCopiaECola ? chaveDestino : undefined)
             });
 
         } catch (error: unknown) {
@@ -196,7 +195,8 @@ export default function PixPage() {
         }
     }
 
-    async function executarEnvioPix(chaveFinal: string) {
+    // 🔥 Recebe o código original de Copia e Cola como parâmetro opcional
+    async function executarEnvioPix(chaveFinal: string, codigoOriginal?: string) {
         setDialog({ ...dialog, isOpen: false });
         setLoadingPix(true);
         try {
@@ -216,7 +216,8 @@ export default function PixPage() {
                     usuario_id: usuario?.usuario_id,
                     chave: chaveFinal,
                     valor: valorFinalFormatado,
-                    descricao: isPixCopiaECola ? `Pagamento via QR Code` : `Pix para a chave: ${chaveFinal}`
+                    descricao: isPixCopiaECola ? `Pagamento via QR Code` : `Pix para a chave: ${chaveFinal}`,
+                    codigo_pix: codigoOriginal || null // 🔥 Manda o código pro back-end processar a baixa
                 })
             });
 
@@ -238,9 +239,6 @@ export default function PixPage() {
         }
     }
 
-    // ==================================================
-    // GERADOR DE RECEBER PIX
-    // ==================================================
     async function gerarCobrancaReceber() {
         if (minhasChaves.length === 0) {
             setDialog({ 
@@ -306,9 +304,6 @@ export default function PixPage() {
         setDialog({ isOpen: true, type: 'success', title: 'Código Copiado!', message: 'O código Pix Copia e Cola foi copiado. Envie para quem vai te pagar.' });
     }
 
-    // ==================================================
-    // FUNÇÕES AUXILIARES MANTIDAS
-    // ==================================================
     async function verSaldo() { 
         const data = localStorage.getItem("data");
         if (!data) return;
@@ -422,7 +417,7 @@ export default function PixPage() {
                 </div>
             </div>
 
-            {/* MODAL DE ENVIAR PIX (AGORA EM SOBREPOSIÇÃO) */}
+            {/* MODAL DE ENVIAR PIX */}
             {showForm && (
                 <div className="fixed inset-0 z-40 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in">
                     <div className="bg-[#111] border border-white/10 w-full max-w-md rounded-3xl p-6 shadow-2xl">
@@ -473,7 +468,7 @@ export default function PixPage() {
                 </div>
             )}
 
-            {/* ABA RECEBER: LISTA DE PENDENTES (MANTIDA INLINE) */}
+            {/* ABA RECEBER: LISTA DE PENDENTES */}
             {showReceberMenu && (
                 <div className="bg-[#111] border border-[#CFAA56]/30 rounded-3xl p-6 mb-8 animate-in fade-in slide-in-from-top-4">
                     <div className="flex justify-between items-center mb-6">
@@ -514,7 +509,7 @@ export default function PixPage() {
                 </div>
             )}
 
-            {/* MODAL DE GERAR COBRANÇA (SOBREPOSIÇÃO) */}
+            {/* MODAL DE GERAR COBRANÇA */}
             {showGerarPagamentoModal && (
                 <div className="fixed inset-0 z-40 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in">
                     <div className="bg-[#111] border border-white/10 w-full max-w-sm rounded-3xl p-6 shadow-2xl">
@@ -595,7 +590,7 @@ export default function PixPage() {
                 </div>
             )}
 
-            {/* MODAL DE MINHAS CHAVES */}
+            {/* MODAL DE MINHAS CHAVES E OUTROS ELEMENTOS */}
             {showChavesModal && (
                 <div className="fixed inset-0 z-40 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in">
                     <div className="bg-[#0A0A0A] border border-white/10 w-full max-w-lg rounded-3xl p-6 flex flex-col max-h-[90vh]">
@@ -634,7 +629,6 @@ export default function PixPage() {
                 </div>
             )}
 
-            {/* O NOVO DIÁLOGO CUSTOMIZADO GLOBAL DA PÁGINA */}
             {dialog.isOpen && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in zoom-in-95 duration-200">
                     <div className="bg-[#0A0A0A] border border-white/10 w-full max-w-sm rounded-3xl p-6 text-center shadow-2xl">
@@ -659,7 +653,6 @@ export default function PixPage() {
                 </div>
             )}
 
-            {/* HISTÓRICO */}
             <div className="bg-[#0A0A0A] border border-white/5 rounded-3xl p-6 mt-8">
                 <h3 className="text-xl font-bold mb-6">Últimas movimentações</h3>
                 <div className="space-y-4">
@@ -684,8 +677,6 @@ export default function PixPage() {
         </AppLayout>
     );
 }
-
-/* ---------- COMPONENTES INTERNOS ---------- */
 
 function PixAction({ icon, label, onClick }: PixActionProps & { onClick?: () => void }) {
     return (
