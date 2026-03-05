@@ -54,17 +54,15 @@ export default function AppLayout({ children, title, subtitle, user, conta }: Pr
         });
 
         // Ouve ativamente por mensagens chamadas 'pixRecebido'
-        socket.on("pixRecebido", (dados: any) => {
-            // Toca um sonzinho rápido (Opcional, funciona na maioria dos navegadores)
-            try { new Audio('/notificacao.mp3').play(); } catch(e) {}
+        socket.on("pixRecebido", (dados: { mensagem: string; valor: number }) => {
+            try { new Audio('/notificacao.mp3').play(); } catch (e) { console.log("Erro ao reproduzir som:", (e as Error).message) }
 
             // Exibe o Toast Dourado e Bonitão
             toast.custom(
                 (t) => (
                     <div
-                        className={`${
-                            t.visible ? 'animate-enter' : 'animate-leave'
-                        } max-w-md w-full bg-[#0A0A0A] border border-[#CFAA56] shadow-2xl rounded-2xl pointer-events-auto flex ring-1 ring-black ring-opacity-5`}
+                        className={`${t.visible ? 'animate-enter' : 'animate-leave'
+                            } max-w-md w-full bg-[#0A0A0A] border border-[#CFAA56] shadow-2xl rounded-2xl pointer-events-auto flex ring-1 ring-black ring-opacity-5`}
                     >
                         <div className="flex-1 w-0 p-4">
                             <div className="flex items-start">
@@ -150,7 +148,7 @@ export default function AppLayout({ children, title, subtitle, user, conta }: Pr
 
             {/* MAIN */}
             <main className="flex-1 p-5 md:p-10 pb-28 md:pb-10 relative">
-                
+
                 {/* HEADER */}
                 <header className="flex justify-between items-center mb-8">
                     <button onClick={() => setMenuOpen(true)} className="md:hidden p-2 rounded-lg bg-white/5">

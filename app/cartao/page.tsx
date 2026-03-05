@@ -11,6 +11,7 @@ import { Conta } from "@/types/Conta";
 import { FiLock, FiSettings, FiPlus, FiTrash, FiX, FiCheckCircle, FiAlertTriangle, FiInfo, FiEye } from "react-icons/fi";
 import { FaCreditCard } from "react-icons/fa6";
 import { CardActionProps, Cartao, CartaoAPI } from "@/types/Cartao";
+import { ApiError } from "@/types/Error";
 
 type DialogConfig = {
     isOpen: boolean;
@@ -131,8 +132,8 @@ export default function CartoesPage() {
             setSelecionado(cartaoCriado);
 
             setDialog({ isOpen: true, type: 'success', title: 'Cartão Emitido!', message: 'Seu novo cartão Atlas já está disponível para uso.' });
-        } catch (error: any) {
-            setDialog({ isOpen: true, type: 'error', title: 'Erro na emissão', message: error.message });
+        } catch (error: unknown) {
+            setDialog({ isOpen: true, type: 'error', title: 'Erro na emissão', message: (error as ApiError)?.message || "Ocorreu um erro ao tentar emitir o cartão." });
         } finally {
             setIsProcessing(false);
         }
@@ -171,8 +172,8 @@ export default function CartoesPage() {
             setSelecionado(novaLista.length > 0 ? novaLista[0] : null);
 
             setDialog({ isOpen: true, type: 'success', title: 'Cartão Cancelado', message: 'O cartão foi excluído e cancelado permanentemente.' });
-        } catch (error: any) {
-            setDialog({ isOpen: true, type: 'error', title: 'Erro', message: error.message });
+        } catch (error: unknown) {
+            setDialog({ isOpen: true, type: 'error', title: 'Erro', message: (error as ApiError)?.message || "Ocorreu um erro ao tentar excluir o cartão." });
         }
     }
 
@@ -210,8 +211,8 @@ export default function CartoesPage() {
             setShowLimitModal(false);
 
             setDialog({ isOpen: true, type: 'success', title: 'Limite Atualizado', message: 'O limite do seu cartão foi ajustado com sucesso.' });
-        } catch (error: any) {
-            setDialog({ isOpen: true, type: 'error', title: 'Ajuste Negado', message: error.message });
+        } catch (error: unknown) {
+            setDialog({ isOpen: true, type: 'error', title: 'Ajuste Negado', message: (error as ApiError)?.message || "Ocorreu um erro ao tentar alterar o limite." });
         } finally {
             setIsProcessing(false);
         }
@@ -246,8 +247,8 @@ export default function CartoesPage() {
                 title: acao === "bloquear" ? 'Cartão Bloqueado' : 'Cartão Desbloqueado', 
                 message: `O cartão foi ${acao === "bloquear" ? 'bloqueado temporariamente' : 'desbloqueado e está pronto para uso'}.` 
             });
-        } catch (error: any) {
-            setDialog({ isOpen: true, type: 'error', title: 'Erro de Segurança', message: error.message });
+        } catch (error: unknown) {
+            setDialog({ isOpen: true, type: 'error', title: 'Erro de Segurança', message: (error as ApiError)?.message || "Ocorreu um erro ao tentar " + acao + " o cartão." });
         } finally {
             setIsProcessing(false);
         }

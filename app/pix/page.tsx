@@ -1,3 +1,4 @@
+/* eslint-disable @next/next/no-img-element */
 "use client";
 
 import { useState, useEffect } from "react";
@@ -19,14 +20,13 @@ type DialogConfig = {
     onConfirm?: () => void;
 };
 
-// 🔥 Adicionado o status opcional no tipo
 type PagamentoPendente = {
     _id: string;
     valor: number;
     codigo_pix: string;
     createdAt: string;
     tipo: "unico" | "recorrente";
-    status?: string; 
+    status?: string;
 };
 
 export default function PixPage() {
@@ -45,18 +45,16 @@ export default function PixPage() {
     const [loadingChave, setLoadingChave] = useState(false);
     const [nomesPix, setNomesPix] = useState<Record<string, string>>({});
 
-    // Estados do ENVIAR PIX
     const [showForm, setShowForm] = useState(false);
     const [chaveDestino, setChaveDestino] = useState("");
     const [valorPix, setValorPix] = useState("");
     const [loadingPix, setLoadingPix] = useState(false);
     const [isPixCopiaECola, setIsPixCopiaECola] = useState(false);
 
-    // Estados do RECEBER PIX
     const [showReceberMenu, setShowReceberMenu] = useState(false);
     const [pagamentosPendentes, setPagamentosPendentes] = useState<PagamentoPendente[]>([]);
     const [showGerarPagamentoModal, setShowGerarPagamentoModal] = useState(false);
-    
+
     const [receberStep, setReceberStep] = useState(1);
     const [valorReceber, setValorReceber] = useState("");
     const [tipoRecebimento, setTipoRecebimento] = useState<"unico" | "recorrente">("unico");
@@ -124,17 +122,17 @@ export default function PixPage() {
 
         if (val.startsWith("000201") && val.length > 30) {
             setIsPixCopiaECola(true);
-            
-            const marker = "530398654"; 
+
+            const marker = "530398654";
             const indexMarker = val.indexOf(marker);
-            
+
             if (indexMarker !== -1) {
                 const index54 = indexMarker + 7;
                 const tamanhoValorStr = val.substring(index54 + 2, index54 + 4);
                 const tamanhoValor = parseInt(tamanhoValorStr, 10);
-                
+
                 const valorReal = val.substring(index54 + 4, index54 + 4 + tamanhoValor);
-                setValorPix(valorReal); 
+                setValorPix(valorReal);
             }
         } else {
             setIsPixCopiaECola(false);
@@ -147,7 +145,7 @@ export default function PixPage() {
             return;
         }
         setLoadingPix(true);
-        
+
         let chaveParaConsultar = chaveDestino;
 
         if (isPixCopiaECola) {
@@ -167,12 +165,12 @@ export default function PixPage() {
             const data = localStorage.getItem("data");
             const parsed = data ? JSON.parse(data) : null;
             const token = parsed?.token;
-            
+
             const resChave = await fetch(`https://api-atlasbank.onrender.com/chaves-pix/consultar/${chaveParaConsultar}`, {
                 headers: { "Authorization": `Bearer ${token}` }
             });
             const dataChave = await resChave.json();
-            
+
             if (!resChave.ok) throw new Error(dataChave.error || "A chave contida neste QR Code não foi encontrada no banco de dados.");
 
             if (String(dataChave.numero_conta_destino) === String(conta?.numero_conta)) {
@@ -184,7 +182,6 @@ export default function PixPage() {
                 type: 'confirm',
                 title: 'Confirmar Transferência',
                 message: `Você está prestes a transferir ${formatarMoeda(Number(valorPix))} para ${dataChave.nome_recebedor}. Deseja confirmar?`,
-                // 🔥 Se for Copia e Cola, nós enviamos o código gigante inteiro também para poder dar a baixa nele
                 onConfirm: () => executarEnvioPix(chaveParaConsultar, isPixCopiaECola ? chaveDestino : undefined)
             });
 
@@ -195,7 +192,6 @@ export default function PixPage() {
         }
     }
 
-    // 🔥 Recebe o código original de Copia e Cola como parâmetro opcional
     async function executarEnvioPix(chaveFinal: string, codigoOriginal?: string) {
         setDialog({ ...dialog, isOpen: false });
         setLoadingPix(true);
@@ -203,7 +199,7 @@ export default function PixPage() {
             const data = localStorage.getItem("data");
             const parsed = data ? JSON.parse(data) : null;
             const token = parsed?.token;
-            
+
             const valorFinalFormatado = parseFloat(Number(valorPix).toFixed(2));
 
             const response = await fetch("https://api-atlasbank.onrender.com/transacoes/pix", {
@@ -217,7 +213,7 @@ export default function PixPage() {
                     chave: chaveFinal,
                     valor: valorFinalFormatado,
                     descricao: isPixCopiaECola ? `Pagamento via QR Code` : `Pix para a chave: ${chaveFinal}`,
-                    codigo_pix: codigoOriginal || null // 🔥 Manda o código pro back-end processar a baixa
+                    codigo_pix: codigoOriginal || null
                 })
             });
 
@@ -241,10 +237,10 @@ export default function PixPage() {
 
     async function gerarCobrancaReceber() {
         if (minhasChaves.length === 0) {
-            setDialog({ 
-                isOpen: true, type: 'error', 
-                title: 'Chave Obrigatória', 
-                message: 'Vincule pelo menos uma Chave Pix no botão "Chaves" antes de gerar cobranças.' 
+            setDialog({
+                isOpen: true, type: 'error',
+                title: 'Chave Obrigatória',
+                message: 'Vincule pelo menos uma Chave Pix no botão "Chaves" antes de gerar cobranças.'
             });
             setShowGerarPagamentoModal(false);
             return;
@@ -252,15 +248,23 @@ export default function PixPage() {
 
         const valorStr = Number(valorReceber).toFixed(2);
         const tamValor = valorStr.length.toString().padStart(2, '0');
-        
-        const chaveUsuario = minhasChaves[0].chave;
+
+        const chaveUsuario = minhasChaves[0]?.chave;
+        if (!chaveUsuario) {
+            setDialog({
+                isOpen: true, type: 'error',
+                title: 'Chave Inválida',
+                message: 'A chave Pix selecionada é inválida.'
+            });
+            return;
+        }
         const tamChave = chaveUsuario.length.toString().padStart(2, '0');
-        
+
         const payloadTag26 = `0014br.gov.bcb.pix01${tamChave}${chaveUsuario}`;
         const tamTag26 = payloadTag26.length.toString().padStart(2, '0');
 
         const payloadRealista = `00020101021126${tamTag26}${payloadTag26}52040000530398654${tamValor}${valorStr}5802BR5913ATLAS BANK6009SAO PAULO62070503***6304D12A`;
-        
+
         setCodigoPixGerado(payloadRealista);
         setReceberStep(3);
 
@@ -271,7 +275,7 @@ export default function PixPage() {
                     method: "POST", headers: { "Authorization": `Bearer ${token}`, "Content-Type": "application/json" },
                     body: JSON.stringify({ valor: Number(valorReceber), codigo_pix: payloadRealista, tipo: tipoRecebimento })
                 });
-                
+
                 if (resCob.ok) {
                     const novaCobranca = await resCob.json();
                     setPagamentosPendentes(prev => [novaCobranca, ...prev]);
@@ -290,7 +294,7 @@ export default function PixPage() {
     }
 
     async function cancelarPendente(id: string) {
-        setPagamentosPendentes(prev => prev.filter(p => p._id !== id)); 
+        setPagamentosPendentes(prev => prev.filter(p => p._id !== id));
         try {
             const token = JSON.parse(localStorage.getItem("data") || "{}").token;
             await fetch(`https://api-atlasbank.onrender.com/cobrancas/${id}`, {
@@ -304,7 +308,7 @@ export default function PixPage() {
         setDialog({ isOpen: true, type: 'success', title: 'Código Copiado!', message: 'O código Pix Copia e Cola foi copiado. Envie para quem vai te pagar.' });
     }
 
-    async function verSaldo() { 
+    async function verSaldo() {
         const data = localStorage.getItem("data");
         if (!data) return;
         const parsed = JSON.parse(data);
@@ -314,7 +318,9 @@ export default function PixPage() {
             const result = await response.json();
             const saldoAPI = result?.contas?.[0]?.saldo;
             if (saldoAPI !== undefined) setConta(prev => prev ? { ...prev, saldo: saldoAPI } : prev);
-        } catch (err) {}
+        } catch (error: unknown) {
+            setDialog({ isOpen: true, type: 'error', title: 'Erro ao atualizar saldo', message: (error as ApiError)?.message || "Não foi possível atualizar o saldo." });
+        }
     }
 
     async function buscarNomePorChave(chave: string) {
@@ -326,7 +332,9 @@ export default function PixPage() {
             });
             const result = await response.json();
             setNomesPix(prev => ({ ...prev, [chave]: result.nome_recebedor }));
-        } catch (err) {}
+        } catch (error: unknown) {
+            setDialog({ isOpen: true, type: 'error', title: 'Erro ao buscar nome', message: (error as ApiError)?.message || "Não foi possível buscar o nome associado a esta chave." });
+        }
     }
 
     useEffect(() => {
@@ -372,7 +380,7 @@ export default function PixPage() {
 
             if (!response.ok) throw new Error("Erro ao cadastrar chave.");
             setDialog({ isOpen: true, type: 'success', title: 'Chave vinculada!', message: `Sua chave ${tipo} foi vinculada.` });
-            
+
             const resChaves = await fetch("https://api-atlasbank.onrender.com/chaves-pix", { headers: { "Authorization": `Bearer ${token}` } });
             if (resChaves.ok) setMinhasChaves(await resChaves.json());
 
@@ -403,7 +411,7 @@ export default function PixPage() {
 
     return (
         <AppLayout title="Pix" subtitle="Envie e receba dinheiro instantaneamente via Pix" user={usuario} conta={conta}>
-            
+
             <div className="grid md:grid-cols-3 gap-6 mb-8">
                 <div className="md:col-span-1 bg-[#0A0A0A] border border-white/5 rounded-3xl p-6 flex flex-col justify-center">
                     <p className="text-gray-400 text-sm mb-2">Saldo disponível</p>
@@ -425,41 +433,41 @@ export default function PixPage() {
                             <h3 className="font-bold text-xl text-white">Enviar Pix</h3>
                             <button onClick={() => setShowForm(false)} className="text-gray-400 hover:text-white"><FiX size={24} /></button>
                         </div>
-                        
+
                         <div className="space-y-4 mb-6">
                             <div>
                                 <label className="text-sm text-gray-400 mb-2 block">Chave Pix ou Copia e Cola</label>
-                                <input 
-                                    type="text" 
-                                    placeholder="" 
-                                    value={chaveDestino} 
-                                    onChange={handleChaveDestinoChange} 
-                                    className="w-full px-4 py-4 rounded-xl bg-[#0A0A0A] border border-white/5 text-white outline-none focus:border-[#CFAA56] transition-colors" 
+                                <input
+                                    type="text"
+                                    placeholder=""
+                                    value={chaveDestino}
+                                    onChange={handleChaveDestinoChange}
+                                    className="w-full px-4 py-4 rounded-xl bg-[#0A0A0A] border border-white/5 text-white outline-none focus:border-[#CFAA56] transition-colors"
                                 />
                             </div>
 
                             <div>
                                 <label className="text-sm text-gray-400 mb-2 block">Valor (R$)</label>
-                                <input 
-                                    type="number" 
-                                    placeholder="0,00" 
-                                    value={valorPix} 
-                                    onChange={(e) => !isPixCopiaECola && setValorPix(e.target.value)} 
-                                    disabled={isPixCopiaECola} 
-                                    className={`w-full px-4 py-4 rounded-xl bg-[#0A0A0A] border border-white/5 text-white outline-none transition-all ${isPixCopiaECola ? 'opacity-50 cursor-not-allowed' : 'focus:border-[#CFAA56]'}`} 
+                                <input
+                                    type="number"
+                                    placeholder="0,00"
+                                    value={valorPix}
+                                    onChange={(e) => !isPixCopiaECola && setValorPix(e.target.value)}
+                                    disabled={isPixCopiaECola}
+                                    className={`w-full px-4 py-4 rounded-xl bg-[#0A0A0A] border border-white/5 text-white outline-none transition-all ${isPixCopiaECola ? 'opacity-50 cursor-not-allowed' : 'focus:border-[#CFAA56]'}`}
                                 />
                             </div>
-                            
+
                             {isPixCopiaECola && (
                                 <p className="text-xs text-green-400 flex items-center gap-1">
-                                    <FiCheckCircle/> Valor detectado automaticamente pelo código Pix.
+                                    <FiCheckCircle /> Valor detectado automaticamente pelo código Pix.
                                 </p>
                             )}
                         </div>
 
-                        <button 
-                            onClick={prepararEnvioPix} 
-                            disabled={loadingPix} 
+                        <button
+                            onClick={prepararEnvioPix}
+                            disabled={loadingPix}
                             className="w-full py-4 rounded-xl bg-[#CFAA56] text-black font-bold hover:bg-[#e2bd6b] transition disabled:opacity-50 text-lg"
                         >
                             {loadingPix ? "Consultando..." : "Avançar"}
@@ -491,7 +499,7 @@ export default function PixPage() {
                                         </div>
                                         <div>
                                             <p className="font-bold text-[#F4E3B2]">{formatarMoeda(p.valor)}</p>
-                                            <p className="text-xs text-gray-500 mt-0.5 capitalize">{p.tipo} • {new Date(p.createdAt).toLocaleTimeString('pt-BR', {hour: '2-digit', minute:'2-digit'})}</p>
+                                            <p className="text-xs text-gray-500 mt-0.5 capitalize">{p.tipo} • {new Date(p.createdAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</p>
                                         </div>
                                     </div>
                                     <div className="flex items-center gap-2">
@@ -513,7 +521,7 @@ export default function PixPage() {
             {showGerarPagamentoModal && (
                 <div className="fixed inset-0 z-40 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in">
                     <div className="bg-[#111] border border-white/10 w-full max-w-sm rounded-3xl p-6 shadow-2xl">
-                        
+
                         {receberStep === 1 && (
                             <div className="animate-in slide-in-from-right-4 duration-300">
                                 <div className="flex justify-between items-center mb-6">
@@ -567,9 +575,9 @@ export default function PixPage() {
                                 </div>
 
                                 <div className="bg-white p-3 rounded-2xl mb-4 shadow-[0_0_30px_rgba(207,170,86,0.15)]">
-                                    <img src={`https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${codigoPixGerado}&margin=0`} alt="QR Code Pix" className="w-48 h-48 md:w-52 md:h-52"/>
+                                    <img src={`https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${codigoPixGerado}&margin=0`} alt="QR Code Pix" className="w-48 h-48 md:w-52 md:h-52" />
                                 </div>
-                                
+
                                 <h2 className="text-4xl font-bold text-[#CFAA56] mb-8">{formatarMoeda(Number(valorReceber))}</h2>
 
                                 <div className="w-full bg-[#0A0A0A] border border-white/5 p-4 rounded-2xl mb-6">

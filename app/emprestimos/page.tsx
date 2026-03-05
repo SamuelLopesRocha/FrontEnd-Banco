@@ -8,6 +8,7 @@ import { UsuarioAPI } from "@/types/Usuario";
 import { Conta } from "@/types/Conta";
 
 import { FiDollarSign, FiTrendingUp, FiClock } from "react-icons/fi";
+import { SummaryCardProps } from "@/types/Emprestimos";
 
 export default function EmprestimosPage() {
     const router = useRouter();
@@ -108,7 +109,7 @@ export default function EmprestimosPage() {
 
 /* COMPONENTE CARD */
 
-function SummaryCard({ icon, title, value }: any) {
+function SummaryCard({ icon, title, value }: SummaryCardProps) {
     return (
         <div className="p-6 rounded-3xl bg-[#0A0A0A] border border-white/5 flex items-center gap-4">
             <div className="text-2xl text-[#CFAA56]">
