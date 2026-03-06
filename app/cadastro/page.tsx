@@ -50,9 +50,8 @@ export default function CadastroPage() {
       if (!response.ok) {
         setMensagem(data.error);
       } else {
-        localStorage.setItem("data", JSON.stringify(data));
-        setMensagem("Cadastro realizado com sucesso!");
-        router.push("/painel");
+        setMensagem("Usuário criado com sucesso! O código de ativação chegará no seu e-mail em instantes.");
+        router.push(`/verificacao?email=${form.email}`);
       }
     } catch {
       setMensagem("Erro ao conectar com o servidor.");

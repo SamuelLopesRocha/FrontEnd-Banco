@@ -41,9 +41,11 @@ export default function LoginPage() {
 
       if (!response.ok) {
         setMensagem(data.error || "Falha no login");
+        if (data.error == "Conta não está ativa.") {
+          router.push(`/verificacao?email=${form.email}`);
+        }
       } else {
         localStorage.setItem("data", JSON.stringify(data));
-
         setMensagem("Login realizado com sucesso!");
         router.push("/painel");
       }
