@@ -165,7 +165,7 @@ export default function PainelPage() {
             {/* AÇÕES */}
             <div className="grid grid-cols-3 gap-3 md:gap-6 mb-8 md:mb-12">
                 <ActionButton icon={<FaPix />} label="Pix" href="/pix" />
-                <ActionButton icon={<FiDollarSign />} label="Pagar" href="/pagamentos" />
+                <ActionButton icon={<FiDollarSign />} label="Boleto" href="/boleto" />
                 <ActionButton icon={<FiCreditCard />} label="Cartões" href="/cartao" />
                 <ActionButton icon={<FaChartLine />} label="Investimentos" href="/investimentos" />
                 <ActionButton icon={<FiShoppingBag />} label="Shopping" href="/shopping" />
