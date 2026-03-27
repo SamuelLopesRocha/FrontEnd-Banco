@@ -1,16 +1,19 @@
 /* eslint-disable @next/next/no-img-element */
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { Pix, PixActionProps, PixItemProps } from "@/types/Pix";
 import AppLayout from "../components/AppLayout";
 import { FaKey, FaTrash } from "react-icons/fa6";
-import { FiArrowUpRight, FiArrowDownLeft, FiX, FiPlus, FiCheckCircle, FiAlertTriangle, FiInfo, FiArrowUp, FiArrowDown, FiCopy, FiClock } from "react-icons/fi";
+import { FiArrowUpRight, FiArrowDownLeft, FiX, FiPlus, FiCheckCircle, FiAlertTriangle, FiInfo, FiArrowUp, FiArrowDown, FiCopy, FiClock, FiCamera } from "react-icons/fi";
 import { Conta } from "@/types/Conta";
 import { UsuarioAPI } from "@/types/Usuario";
 import { ApiError } from "@/types/Error";
 import { Transacao, TransacaoAPI } from "@/types/Extrato";
+
+import { Html5Qrcode } from "html5-qrcode";
+import { toast } from "react-hot-toast";
 
 type DialogConfig = {
     isOpen: boolean;
@@ -61,6 +64,12 @@ export default function PixPage() {
     const [codigoPixGerado, setCodigoPixGerado] = useState("");
     const [visualizandoPendente, setVisualizandoPendente] = useState(false);
 
+    // ==========================================
+    // ESTADOS DA CÂMERA
+    // ==========================================
+    const [isScanning, setIsScanning] = useState(false);
+    const scannerRef = useRef<Html5Qrcode | null>(null);
+
     useEffect(() => {
         async function carregarDados() {
             const data = localStorage.getItem("data");
@@ -94,7 +103,6 @@ export default function PixPage() {
                 });
                 if (resChaves.ok) setMinhasChaves(await resChaves.json());
 
-                // 🔥 Busca as Cobranças Pendentes no BD e filtra APENAS as que estão "PENDENTE"
                 const resCobrancas = await fetch("https://api-atlasbank.onrender.com/cobrancas", { headers: { "Authorization": `Bearer ${token}` } });
                 if (resCobrancas.ok) {
                     const cobrancasRaw = await resCobrancas.json();
@@ -116,8 +124,8 @@ export default function PixPage() {
         return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(valor);
     };
 
-    function handleChaveDestinoChange(e: React.ChangeEvent<HTMLInputElement>) {
-        const val = e.target.value;
+    // Função refatorada para ser usada tanto pelo input manual quanto pela câmera
+    function processarChaveOuQRCode(val: string) {
         setChaveDestino(val);
 
         if (val.startsWith("000201") && val.length > 30) {
@@ -138,6 +146,59 @@ export default function PixPage() {
             setIsPixCopiaECola(false);
         }
     }
+
+    function handleChaveDestinoChange(e: React.ChangeEvent<HTMLInputElement>) {
+        processarChaveOuQRCode(e.target.value);
+    }
+
+    // ==========================================
+    // CÂMERA SCANNER (LENDO A TELA INTEIRA PARA O PIX)
+    // ==========================================
+    async function startScanner() {
+        setIsScanning(true);
+        setTimeout(async () => {
+            try {
+                scannerRef.current = new Html5Qrcode("reader-pix", {
+                    experimentalFeatures: {
+                        useBarCodeDetectorIfSupported: true
+                    },
+                    verbose: false
+                });
+
+                await scannerRef.current.start(
+                    { facingMode: "environment" },
+                    {
+                        fps: 15 
+                        // 🔥 REMOVIDO O 'qrbox' AQUI TAMBÉM!
+                        // Agora a câmera vai procurar o QR Code em 100% do campo de visão.
+                    },
+                    (decodedText) => {
+                        processarChaveOuQRCode(decodedText);
+                        stopScanner();
+                        toast.success("QR Code lido com sucesso!");
+                    },
+                    (errorMessage) => {
+                        // Silenciado propositalmente para não poluir o console
+                    }
+                );
+            } catch (err) {
+                console.error("Erro na câmera:", err);
+                toast.error("Erro ao acessar a câmera. Verifique as permissões.");
+                stopScanner();
+            }
+        }, 100);
+    }
+
+    async function stopScanner() {
+        if (scannerRef.current) {
+            try {
+                await scannerRef.current.stop();
+                scannerRef.current.clear();
+            } catch (err) { }
+        }
+        setIsScanning(false);
+    }
+
 
     async function prepararEnvioPix() {
         if (!chaveDestino || !valorPix) {
@@ -425,10 +486,20 @@ export default function PixPage() {
                 </div>
             </div>
 
-            {/* MODAL DE ENVIAR PIX */}
+            {/* MODAL DE ENVIAR PIX (AGORA COM CÂMERA!) */}
             {showForm && (
                 <div className="fixed inset-0 z-40 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in">
-                    <div className="bg-[#111] border border-white/10 w-full max-w-md rounded-3xl p-6 shadow-2xl">
+                    <div className="bg-[#111] border border-white/10 w-full max-w-md rounded-3xl p-6 shadow-2xl relative overflow-hidden">
+                        
+                        {/* SOBREPOSIÇÃO DA CÂMERA DO QR CODE */}
+                        {isScanning && (
+                            <div className="absolute inset-0 z-50 bg-black flex flex-col items-center justify-center p-4">
+                                <h3 className="text-white font-bold mb-4 text-center">Aponte a câmera para o QR Code</h3>
+                                <div id="reader-pix" className="w-full max-w-sm rounded-2xl overflow-hidden bg-black border border-[#CFAA56]/30"></div>
+                                <button onClick={stopScanner} className="mt-6 py-3 px-8 rounded-xl bg-white/10 text-white font-bold hover:bg-white/20 transition">Cancelar</button>
+                            </div>
+                        )}
+
                         <div className="flex justify-between items-center mb-6">
                             <h3 className="font-bold text-xl text-white">Enviar Pix</h3>
                             <button onClick={() => setShowForm(false)} className="text-gray-400 hover:text-white"><FiX size={24} /></button>
@@ -444,6 +515,11 @@ export default function PixPage() {
                                     onChange={handleChaveDestinoChange}
                                     className="w-full px-4 py-4 rounded-xl bg-[#0A0A0A] border border-white/5 text-white outline-none focus:border-[#CFAA56] transition-colors"
                                 />
+
+                                {/* 🔥 BOTÃO DE LER COM A CÂMERA */}
+                                <button onClick={startScanner} className="w-full mt-3 flex items-center justify-center gap-2.5 py-3 rounded-lg bg-black border border-[#CFAA56]/30 text-[#CFAA56] font-medium hover:bg-[#CFAA56]/10 transition text-sm">
+                                    <FiCamera size={18} /> Ler QR Code
+                                </button>
                             </div>
 
                             <div>

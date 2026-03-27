@@ -196,7 +196,7 @@ export default function AppLayout({ children, title, subtitle, user, conta }: Pr
                         <nav className="space-y-2">
                             <NavItem icon={<FiHome />} label="Home" href="/painel" active={pathname === "/painel"} />
                             <NavItem icon={<FaPix />} label="Pix" href="/pix" active={pathname === "/pix"} />
-                            <NavItem icon={<FiDollarSign />} label="Pagamentos" href="/pagamentos" active={pathname === "/pagamentos"} />
+                            <NavItem icon={<FiDollarSign />} label="Boleto" href="/boleto" active={pathname === "/boleto"} />
                             <NavItem icon={<FiCreditCard />} label="Cartões" href="/cartao" active={pathname === "/cartao"} />
                             <NavItem icon={<PiHandCoinsBold />} label="Empréstimos" href="/emprestimos" active={pathname === "/emprestimos"} />
                             <NavItem icon={<FaChartLine />} label="Investimentos" href="/investimentos" active={pathname === "/investimentos"} />

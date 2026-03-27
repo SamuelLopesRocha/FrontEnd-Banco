@@ -8,12 +8,13 @@ import { HistoryItemProps, PagamentosActionProps, PagamentosInputProps } from "@
 import { UsuarioAPI } from "@/types/Usuario";
 import { Conta } from "@/types/Conta"
 
-import { Html5Qrcode } from "html5-qrcode";
+import { Html5Qrcode, Html5QrcodeSupportedFormats } from "html5-qrcode";
 import { toast } from "react-hot-toast";
 
 // 🔥 Ícone FiPlusCircle restaurado no lugar da setinha
 import { FiBarChart, FiClock, FiX, FiCamera, FiPlus, FiCopy, FiPlusCircle } from "react-icons/fi";
 import { FaBarcode } from "react-icons/fa6";
+
 
 type BoletoPendente = {
     _id: string;
@@ -30,7 +31,7 @@ export default function PagamentosPage() {
     const [isLoading, setIsLoading] = useState(true);
     const [usuario, setUsuario] = useState<UsuarioAPI | null>(null);
     const [conta, setConta] = useState<Conta | null>(null);
-    
+
     // MODAL DE PAGAR
     const [showForm, setShowForm] = useState(false);
     const [boletoDetails, setBoletoDetails] = useState<any | null>(null);
@@ -39,7 +40,7 @@ export default function PagamentosPage() {
     // MODAL E LISTA DE RECEBER/CRIAR BOLETO
     const [showReceberMenu, setShowReceberMenu] = useState(false);
     const [boletosPendentes, setBoletosPendentes] = useState<BoletoPendente[]>([]);
-    
+
     const [showGerarBoletoModal, setShowGerarBoletoModal] = useState(false);
     const [gerarStep, setGerarStep] = useState(1);
     const [valorGerar, setValorGerar] = useState("");
@@ -115,7 +116,7 @@ export default function PagamentosPage() {
 
             toast.success("Boleto pago com sucesso!");
             setShowForm(false);
-            setBoletoDetails(null); 
+            setBoletoDetails(null);
             setTimeout(() => window.location.reload(), 1500); // Recarrega para atualizar saldo
 
         } catch (error: any) {
@@ -133,7 +134,7 @@ export default function PagamentosPage() {
             toast.error("Preencha o valor e a data.");
             return;
         }
-        
+
         try {
             const token = JSON.parse(localStorage.getItem("data") || "{}").token;
             const res = await fetch("https://api-atlasbank.onrender.com/boletos", {
@@ -141,7 +142,7 @@ export default function PagamentosPage() {
                 headers: { "Authorization": `Bearer ${token}`, "Content-Type": "application/json" },
                 body: JSON.stringify({ valor: Number(valorGerar), vencimento: vencimentoGerar })
             });
-            
+
             if (res.ok) {
                 const novoBoleto = await res.json();
                 setBoletosPendentes([novoBoleto, ...boletosPendentes]);
@@ -160,7 +161,7 @@ export default function PagamentosPage() {
             await fetch(`https://api-atlasbank.onrender.com/boletos/${id}`, {
                 method: "DELETE", headers: { "Authorization": `Bearer ${token}` }
             });
-            setBoletosPendentes(prev => prev.filter(b => b._id !== id)); 
+            setBoletosPendentes(prev => prev.filter(b => b._id !== id));
             toast.success("Boleto cancelado.");
         } catch (e) { }
     }
@@ -177,25 +178,38 @@ export default function PagamentosPage() {
     }
 
     // ==========================================
-    // CÂMERA SCANNER
+    // CÂMERA SCANNER (LENDO A TELA INTEIRA)
     // ==========================================
     async function startScanner() {
         setIsScanning(true);
         setTimeout(async () => {
             try {
-                scannerRef.current = new Html5Qrcode("reader");
+                scannerRef.current = new Html5Qrcode("reader", {
+                    experimentalFeatures: {
+                        useBarCodeDetectorIfSupported: true
+                    },
+                    verbose: false 
+                });
+
                 await scannerRef.current.start(
                     { facingMode: "environment" },
-                    { fps: 10, qrbox: { width: 320, height: 120 } },
+                    { 
+                        fps: 20 
+                        // 🔥 REMOVEMOS O QRBOX! 
+                        // Agora não tem mais "caixinha", ele vai ler qualquer código que aparecer na tela inteira da câmera.
+                    },
                     (decodedText) => {
                         setCodigo(decodedText);
                         stopScanner();
                         toast.success("Código lido com sucesso!");
                     },
-                    () => {}
+                    (errorMessage) => {
+                        // Silenciado propositalmente
+                    }
                 );
             } catch (err) {
-                toast.error("Permita o acesso à câmera.");
+                console.error("Erro na câmera:", err);
+                toast.error("Erro ao acessar a câmera. Tente digitar o código.");
                 stopScanner();
             }
         }, 100);
@@ -219,7 +233,7 @@ export default function PagamentosPage() {
 
     return (
         <AppLayout title="Boleto" subtitle="Pague boletos e contas rapidamente" user={usuario} conta={conta}>
-            
+
             <div className="grid md:grid-cols-3 gap-6 mb-8">
                 <div className="md:col-span-1 bg-[#0A0A0A] border border-white/5 rounded-3xl p-6 flex flex-col justify-center">
                     <p className="text-gray-400 text-sm mb-2">Saldo disponível</p>
@@ -228,10 +242,10 @@ export default function PagamentosPage() {
 
                 <div className="md:col-span-2 grid grid-cols-3 gap-4">
                     <Action icon={<FaBarcode />} label="Pagar boleto" onClick={() => { setShowReceberMenu(false); setShowForm(true); }} />
-                    
+
                     {/* 🔥 BOTÃO RESTAURADO E APONTANDO PARA O MENU DE LISTA */}
                     <Action icon={<FiPlusCircle />} label="Criar boleto" onClick={() => { setShowForm(false); setShowReceberMenu(!showReceberMenu); }} />
-                    
+
                     <Action icon={<FiClock />} label="Agendados" />
                 </div>
             </div>
@@ -279,18 +293,20 @@ export default function PagamentosPage() {
 
             {/* MODAL: CRIAR BOLETO (ETAPAS) */}
             {showGerarBoletoModal && (
-                <div className="fixed inset-0 z-40 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in">
-                    <div className="bg-[#111] border border-white/10 w-full max-w-sm rounded-3xl p-6 shadow-2xl relative overflow-hidden">
-                        
+                <div className="fixed inset-0 z-40 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in overflow-y-auto">
+                    
+                    {/* 🔥 MODAL DINÂMICO: max-w-md na Etapa 1, e max-w-max na Etapa 2 para caber o boleto gigante */}
+                    <div className={`bg-[#111] border border-white/10 w-full ${gerarStep === 1 ? 'max-w-md' : 'max-w-[95vw] md:max-w-max'} rounded-3xl p-6 shadow-2xl relative overflow-x-auto transition-all duration-300`}>
+
                         <div className="flex justify-between items-center mb-6">
                             <h3 className="font-bold text-xl text-white">Criar Boleto</h3>
                             <button onClick={() => setShowGerarBoletoModal(false)} className="text-gray-400 hover:text-white">
                                 <FiX size={24} />
                             </button>
                         </div>
-                        
+
                         {gerarStep === 1 ? (
-                            <div className="space-y-4 mb-2 animate-in slide-in-from-right-4 duration-300">
+                            <div className="space-y-4 mb-2 animate-in slide-in-from-right-4 duration-300 w-full sm:min-w-[350px]">
                                 <div>
                                     <label className="text-sm text-gray-400 mb-2 block">Valor (R$)</label>
                                     <input
@@ -312,20 +328,22 @@ export default function PagamentosPage() {
                             </div>
                         ) : (
                             <div className="flex flex-col items-center animate-in zoom-in-95 duration-300 mt-2">
-                                
-                                <div className="bg-white p-4 rounded-xl mb-6 w-full flex justify-center">
+
+                                {/* 🔥 CAIXA BRANCA EXPANSIVA (Sem scrollbar, abraça o tamanho total) */}
+                                <div className="bg-white p-6 rounded-xl mb-6 flex justify-center items-center">
                                     {boletoGeradoVisualizando && (
                                         <img 
-                                            src={`https://bwipjs-api.metafloor.com/?bcid=interleaved2of5&text=${boletoGeradoVisualizando.codigo_barras}&scale=2&height=12&includetext=false`} 
+                                            src={`https://bwipjs-api.metafloor.com/?bcid=interleaved2of5&text=${boletoGeradoVisualizando.codigo_barras}&scale=3&height=18&includetext=false&backgroundcolor=ffffff&padding=10`} 
                                             alt="Código de Barras" 
-                                            className="w-full h-20 object-contain"
+                                            /* O max-w-none garante que a imagem não seja espremida pelo CSS */
+                                            className="h-28 max-w-none object-contain pointer-events-none"
                                         />
                                     )}
                                 </div>
 
                                 <p className="text-gray-400 text-sm mb-2 font-medium">Linha Digitável</p>
                                 <div className="bg-[#0A0A0A] border border-white/5 w-full p-4 rounded-xl mb-6 flex flex-col items-center">
-                                    <p className="text-white font-mono text-xs text-center break-words leading-relaxed">
+                                    <p className="text-white font-mono text-xs md:text-sm text-center break-words leading-relaxed">
                                         {boletoGeradoVisualizando?.linha_digitavel}
                                     </p>
                                 </div>
@@ -347,7 +365,7 @@ export default function PagamentosPage() {
             {showForm && (
                 <div className="fixed inset-0 z-40 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in">
                     <div className="bg-[#111] border border-white/10 w-full max-w-md rounded-3xl p-6 shadow-2xl relative overflow-hidden">
-                        
+
                         {isScanning && (
                             <div className="absolute inset-0 z-50 bg-black flex flex-col items-center justify-center p-4">
                                 <h3 className="text-white font-bold mb-4 text-center">Aponte a câmera para as barras</h3>
@@ -360,17 +378,17 @@ export default function PagamentosPage() {
                             <h3 className="font-bold text-xl text-white">Pagar Boleto</h3>
                             <button onClick={() => { setShowForm(false); setBoletoDetails(null); }} className="text-gray-400 hover:text-white"><FiX size={24} /></button>
                         </div>
-                        
+
                         <div className="space-y-4 mb-6">
                             <div>
                                 <label className="text-sm text-gray-400 mb-2 block">Código de barras / linha digitável</label>
                                 <Input name="codigo" placeholder="Insira o código numérico" value={codigo} onChange={handleChange} />
-                                
+
                                 <button onClick={startScanner} className="w-full mt-3 flex items-center justify-center gap-2.5 py-3 rounded-lg bg-black border border-[#CFAA56]/30 text-[#CFAA56] font-medium hover:bg-[#CFAA56]/10 transition text-sm">
                                     <FiCamera size={18} /> Ler boleto com a câmera
                                 </button>
                             </div>
-                            
+
                             {boletoDetails && (
                                 <div className="p-4 rounded-xl bg-white/[0.03] border border-[#CFAA56]/30 animate-in fade-in">
                                     <p className="text-xs text-[#CFAA56] mb-1 font-bold uppercase">Boleto Encontrado:</p>
