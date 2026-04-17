@@ -8,7 +8,7 @@ import { UsuarioAPI } from "@/types/Usuario";
 import { Conta } from "@/types/Conta";
 
 // 🔥 Adicionado o FiEye aqui
-import { FiLock, FiSettings, FiPlus, FiTrash, FiX, FiCheckCircle, FiAlertTriangle, FiInfo, FiEye } from "react-icons/fi";
+import { FiLock, FiSettings, FiPlus, FiTrash, FiX, FiCheckCircle, FiAlertTriangle, FiInfo, FiEye, FiFileText, FiShoppingCart } from "react-icons/fi";
 import { FaCreditCard } from "react-icons/fa6";
 import { CardActionProps, Cartao, CartaoAPI } from "@/types/Cartao";
 import { ApiError } from "@/types/Error";
@@ -323,10 +323,20 @@ export default function CartoesPage() {
                     </div>
 
                     {/* AÇÕES (Agora com 5 botões e grid responsivo) */}
-                    <div className="grid grid-cols-2 md:grid-cols-5 gap-3 md:gap-4 mb-10">
-                        {/* 🔥 Novo botão de Ver Dados */}
+                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 md:gap-4 mb-10">
                         <CardAction icon={<FiEye />} label="Ver Dados" onClick={() => setShowDetailsModal(true)} />
-                        
+                        <CardAction
+                            icon={<FiFileText />}
+                            label="Faturas"
+                            onClick={() =>
+                                router.push(`/cartao/faturas?cartao=${encodeURIComponent(selecionado._id)}`)
+                            }
+                        />
+                        <CardAction
+                            icon={<FiShoppingCart />}
+                            label="Compras"
+                            onClick={() => router.push(`/cartao/compras?cartao=${encodeURIComponent(selecionado._id)}`)}
+                        />
                         <CardAction
                             icon={<FiLock />}
                             label={selecionado.status_cartao === "ATIVO" ? "Bloquear" : "Desbloquear"}
